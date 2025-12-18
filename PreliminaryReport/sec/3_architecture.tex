@@ -1,21 +1,12 @@
 \section{Model architecture and interpretability}
 \label{sec:architecture}
 
- \noindent\textit{(Research lead: Necati Deniz Baykuş)}
+\noindent\textit{(Research lead: Necati Deniz Baykuş)}
 
-The architecture work first compares three options—basic CNN, ResNet-18, and AlexNet—before settling on ResNet-18 due to its superior accuracy-to-parameter trade-off and its smoother internal representations that pair well with explainability tools \cite{talele2024cnnresnet, zhang2024alexnetresnet, reginato2024practical}. ResNet's identity-preserving skips also make it easier to capture discriminative features even when only $64\times64$ pixels are available. Because the canonical ResNet-18 expects $224\times224$ inputs, the initial $7\times7$ stride-2 convolution is replaced with a $3\times3$ stride-1 kernel to keep the receptive field growth in check and to safeguard horizontal and vertical detail inside each low-resolution face \cite{modi2021resnet}. The downstream residual stages keep their batch normalisation and ReLU activations, global average pooling reduces the spatial footprint, and the head is a six-node softmax emitting probabilities for happiness, surprise, sadness, anger, disgust, and fear.
+The research asserts that success depends on an architecture capable of extracting discriminative features from $64\times64$ inputs while staying efficient enough for real-time deployment. A survey of three families—baseline CNNs, ResNet-18, and AlexNet—identified ResNet-18 as the preferred backbone because it balances accuracy with parameter efficiency and distributes attention more evenly across the face, which dovetails with explainability tools that do not rely on single localized regions \cite{talele2024cnnresnet, zhang2024alexnetresnet, reginato2024practical}.
 
-Hyperparameters mirror the research recommendations: Adam ($\beta_1{=}0.9, \beta_2{=}0.999$) is the default optimiser coupled with ReduceLROnPlateau, while SGD with momentum stands ready if a slower, more controlled descent is needed. Weighted cross-entropy compensates for the imbalanced expressions, dropout (0.3) regularises the late blocks, and $L_2$ weight decay keeps magnitudes in check \cite{pandeya2025resnet}. These settings aim for stable learning rather than chasing aggressive fine-tuning results that could overfit to the more frequent classes.
+To adapt ResNet-18 for the constrained input size, the original $7\times7$ stride-2 convolution is swapped for a $3\times3$ stride-1 kernel so the receptive field expands cautiously and the low-resolution grid retains horizontal and vertical detail \cite{modi2021resnet}. The downstream four residual stages keep the original Batch Normalisation and ReLU blocks, global average pooling collapses spatial maps, and the final layer is a six-node softmax over happiness, surprise, sadness, anger, disgust, and fear. The same ResNet adjustments also keep parameter counts modest (around 11M), which fits the planned demo use cases.
+
+Hyperparameter exploration showed that a Swish-activated ResNet-18 trained with Adam and CosineAnnealingWarmRestarts produced the strongest testing accuracy, so those elements stay central to the implementation along with the standard regularization techniques already described \cite{pandeya2025resnet}.
 
 Grad-CAM is the explainability tool of choice because preserving spatial structure up to the final pooling simplifies gradient backpropagation, producing saliency maps that highlight semantically meaningful areas (eyes for surprise, mouth for happiness, brows for anger) \cite{selvaraju2017gradcam}. These heatmaps are designed to be overlaid on the live video stream as described elsewhere, providing immediate interpretability.
-
-\begin{figure}[t]
-  \centering
-  {
-    \setlength{\fboxrule}{0.5pt}
-    \setlength{\fboxsep}{2pt}
-    \fbox{\includegraphics[width=0.21\linewidth]{resnet18.jpeg}}
-  }
-  \caption{Adapted ResNet-18 backbone with a smaller initial kernel, residual stages, global average pooling, and six-output softmax tailored to the emotion taxonomy.}
-  \label{fig:resnet18}
-\end{figure}
