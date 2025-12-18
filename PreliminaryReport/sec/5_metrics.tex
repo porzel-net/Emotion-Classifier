@@ -1,0 +1,18 @@
+\section{Metrics and validation}
+\label{sec:metrics}
+
+\noindent\textit{(Research lead: Isabela Labus)}
+
+Depending on the chosen data sets, emotion classes like disgust, fear and anger might be underrepresented, making the class distributions imbalanced. Additionally, as some classes such as disgust and anger might be classified by the model as the same emotion, data difficulty factors such as class overlap contribute to imbalanced classes (Carvalho et al., 2025).
+
+Taking class imbalance into account as well as class overlap possibly exacerbating class imbalance and worsening model evaluation (Carvalho et al., 2025), the performance of our classifier should be additionally measured by a macro-averaged F1-score, class specific macro-precision and macro-recall.
+
+Accuracy will be one of the classification metrics used for our classification model as accuracy is one of the most utilized metrics for evaluating classifier performance, however, for imbalanced data sets, accuracy would not be sufficient (Juba and Le, 2019). The major problem is that in imbalanced classes its score is dominated by majority classes (Carvalho et al., 2025). Similarly, Juba and Le (2019) emphasize that a high accuracy score could be misleading when a dominant class has a stronger influence on the metric, which is why a poor performance of a classifier can likely not be caught by that score.
+
+Therefore, accuracy will be included as a baseline metric in our project, but for reasons stated above, other metrics will be used as well.
+
+Macro-averaged F1 could be a useful additional evaluation score because it makes no distinction between classes with high or low samples and all classes, regardless of size, contribute equally to the metric (Grandini et al., 2020). This would help our case tremendously. Macro-precision and macro-recall are computed first, then they are combined as a harmonic mean, which results in said F1-score (Grandini et al., 2020). Since precision and recall are calculated per class, I view them as additional insight where we can see which classes are over- or underpredicted; information that is neither provided by accuracy nor macro-F1. For this reason, they will be used in the evaluation step.
+
+Lastly, we use hold-out as our validation strategy. Since the convolutional neural network classification model is trained from scratch on newly chosen data sets and the project has to be completed in a limited time frame, training the model and then testing it once is the most practical solution and an efficient evaluation strategy.
+
+In hold-out validation, the data is divided into different training and validation subsets, while the validation set is not used during training (Bami et al., 2025). Testing the model on data that was not used during training helps prevent overfitting and provides a realistic estimate of how well the model performs on new data (Bami et al., 2025). And although hold-out validation can give slightly lower accuracy than k-fold cross-validation (Bami et al., 2025), it is a good choice for our project as it is easier to work with.

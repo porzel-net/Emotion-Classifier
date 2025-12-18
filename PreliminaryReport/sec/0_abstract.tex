@@ -1,5 +1,5 @@
 \begin{abstract}
-The ABSTRACT is to be in fully justified italicized text, at the top of the left-hand column and below the author.
-The abstract is to be in 10-point, single-spaced type.
-Leave two blank lines after the Abstract, then begin the main text.
+We outline an emotion-classification pipeline that adapts a ResNet-18 backbone to the fixed $64\times64$ input size mandated by the SEP task, couples it with a multi-source, preprocessing-first data strategy, and prioritizes balanced, explainable predictions for six canonical expressions.
+The preprocessing pipeline stabilizes faces, intelligently upscales FER-2013 frames, and progressively merges AffectNet and RAF-DB sources so that the limited pixel budget is devoted to expressive detail rather than nuisance pose variation.
+Weighted cross-entropy, regularisation, and Grad-CAM saliency maps keep the training stable while enabling interpretable feedback, and macro-averaged metrics plus a hold-out validation split ensure performance is measured reliably despite the amplified class imbalance.
 \end{abstract}

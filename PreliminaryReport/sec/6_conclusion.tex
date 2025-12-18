@@ -1,0 +1,6 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+The preliminary report now captures the blueprint for the SEP Emotion Classifier: a multi-source data strategy that stabilizes and balances FER inputs, a modified ResNet-18 architecture that preserves spatial detail and supports Grad-CAM saliency, an optimisation pipeline that penalises misclassification of rare emotions, and a validation suite driven by macro-averaged metrics. 
+The research emphasises discussion over final verdict: while combining FER-2013, AffectNet, and RAF-DB should increase variance, it also invites negative transfer, which is why the progressive MSDA and BORT$^2$ techniques exist alongside the more conservative single-dataset fallback. Similarly, the architecture and metric choices keep options open for lighter backbones or additional explainability layers once the current prototype matures.
+This document should therefore serve as a reference for future drafts, allowing implementation work to decide which of the discussed alternatives to activate, and helping the final report justify why certain research paths were chosen or deferred.

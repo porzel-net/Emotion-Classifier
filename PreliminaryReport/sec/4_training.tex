@@ -1,0 +1,8 @@
+\section{Training and optimisation}
+\label{sec:training}
+
+\noindent\textit{(Research lead: Mehmet Berberoğlu)}
+
+Training mirrors the staged pipeline described in the optimisation research. After the preprocessing stack produces normalized $64\times64$ faces, mini-batches travel through the modified ResNet-18 and the softmax outputs feed into weighted cross-entropy. Training runs for multiple epochs with checkpointing to enforce a dedicated validation split, thereby exposing overfitting tendencies that often arise from dataset-specific artefacts or the limited expressive content of fixed-resolution faces.
+
+Class imbalance is mitigated through the loss weights: each rare emotion is assigned a greater contribution so that its misclassifications change the gradient significantly. If weighting proves insufficient to enforce parity, the plan includes more advanced sampling strategies (e.g., over-sampling minority classes or using focal loss variants). ReLU activations throughout the network keep gradients well-behaved, while dropout in the final residual blocks and $L_2$ weight decay curb reliance on single neurons or runaway parameters when the training data are noisy or diverse. Together these measures prioritise stable, balanced learning rather than maximal but brittle accuracy.
