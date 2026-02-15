@@ -1,0 +1,7 @@
+numpy<2
+opencv-python
+face-alignment
+pillow
+torch
+torchvision
+tensorflow>=2.14
