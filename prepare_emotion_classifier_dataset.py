@@ -8,6 +8,7 @@ from pathlib import Path
 import cv2
 import face_alignment
 import numpy as np
+from neconet_helpers import apply_sobel
 
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -66,6 +67,7 @@ def process_split(model, split_path, split_name, target_root, target_size):
             )
 
             resized = cv2.resize(frame, target_size, interpolation=cv2.INTER_AREA)
+            sobel_frame = apply_sobel(resized)
 
             scaled_landmarks = scale_landmarks(
                 np.array(landmarks), frame.shape[:2], target_size
@@ -77,7 +79,7 @@ def process_split(model, split_path, split_name, target_root, target_size):
             rel_output = (
                 dest_dir / image_path.name
             )
-            cv2.imwrite(str(rel_output), resized)
+            cv2.imwrite(str(rel_output), sobel_frame)
 
             logging.info(
                 "Saved %s (%s/%s) resized=%dx%d",

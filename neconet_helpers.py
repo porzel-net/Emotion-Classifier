@@ -10,7 +10,10 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+import cv2
+import numpy as np
 import torch
+from PIL import Image
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -61,10 +64,29 @@ def trim_dataset(dataset: EmotionFolderWithPaths, max_samples: Optional[int] = N
     dataset.imgs = trimmed
 
 
-def build_transform() -> transforms.Compose:
+def apply_sobel(image: np.ndarray) -> np.ndarray:
+    if image.ndim == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image
+    grad_x = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    grad_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    magnitude = cv2.magnitude(grad_x, grad_y)
+    normalized = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
+    return normalized.astype(np.uint8)
+
+
+def apply_sobel_to_pil(image: Image.Image) -> Image.Image:
+    array = np.array(image)
+    sobel_array = apply_sobel(array)
+    return Image.fromarray(sobel_array)
+
+
+def build_transform(sobel: bool = False) -> transforms.Compose:
     return transforms.Compose(
         [
             transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            *([transforms.Lambda(apply_sobel_to_pil)] if sobel else []),
             transforms.Grayscale(num_output_channels=1),
             transforms.ToTensor(),
             transforms.Normalize(NORMALIZE_MEAN, NORMALIZE_STD),
@@ -78,8 +100,9 @@ def build_loader(
     batch_size: int = 32,
     workers: int = 2,
     max_samples: Optional[int] = None,
+    sobel: bool = False,
 ) -> tuple[EmotionFolderWithPaths, DataLoader]:
-    dataset = EmotionFolderWithPaths(root=root / split, transform=build_transform())
+    dataset = EmotionFolderWithPaths(root=root / split, transform=build_transform(sobel=sobel))
     filter_classes(dataset)
     trim_dataset(dataset, max_samples)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=workers)
