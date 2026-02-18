@@ -425,6 +425,8 @@ def compute_loss(logits: torch.Tensor, targets: torch.Tensor, criterion: nn.Modu
 def _prepare_batch(batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor]):
     inputs, targets = batch[:2]
     landmarks = batch[2] if len(batch) > 2 else None
+    if landmarks is not None and not isinstance(landmarks, torch.Tensor):
+        landmarks = None
     return inputs, targets, landmarks
 
 
