@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import face_alignment
@@ -24,6 +25,124 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 INPUT_TRANSFORM = build_transform()
+EXPLAIN_METHODS = ("saliency", "activations", "occlusion", "cam", "gradcam")
+
+
+def _normalize_heatmap(tensor: torch.Tensor) -> torch.Tensor:
+    tensor = tensor.detach().clone()
+    tensor = tensor - tensor.min()
+    max_val = tensor.max()
+    if max_val > 0:
+        tensor = tensor / max_val
+    return tensor.clamp(0, 1)
+
+
+def _tensor_to_heatmap(tensor: torch.Tensor) -> np.ndarray:
+    return _normalize_heatmap(tensor).cpu().numpy()
+
+
+def _overlay_heatmap(frame: np.ndarray, box: tuple[tuple[int, int], tuple[int, int]], heatmap: np.ndarray) -> None:
+    (x1, y1), (x2, y2) = box
+    if x2 <= x1 or y2 <= y1:
+        return
+    overlay = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
+    overlay = cv2.resize(overlay, (x2 - x1, y2 - y1), interpolation=cv2.INTER_LINEAR)
+    roi = frame[y1:y2, x1:x2]
+    frame[y1:y2, x1:x2] = cv2.addWeighted(roi, 0.5, overlay, 0.5, 0)
+
+
+class LayerCapture:
+    """Hook into a module to capture activations (and gradients when available)."""
+
+    def __init__(self, module: torch.nn.Module):
+        self.module = module
+        self.activations: Optional[torch.Tensor] = None
+        self.gradients: Optional[torch.Tensor] = None
+        self._forward = module.register_forward_hook(self._save_activation)
+        self._backward = module.register_full_backward_hook(self._save_gradient)
+
+    def _save_activation(self, module: torch.nn.Module, _input, output: torch.Tensor) -> None:
+        self.activations = output
+
+    def _save_gradient(self, module: torch.nn.Module, _grad_input, grad_output) -> None:
+        grad = grad_output[0]
+        if grad is not None:
+            self.gradients = grad
+
+    def reset(self) -> None:
+        self.activations = None
+        self.gradients = None
+
+    def close(self) -> None:
+        self._forward.remove()
+        self._backward.remove()
+
+
+def _compute_saliency_heatmap(model: torch.nn.Module, logits: torch.Tensor, tensor: torch.Tensor, class_idx: int) -> np.ndarray:
+    model.zero_grad(set_to_none=True)
+    score = logits[0, class_idx]
+    score.backward()
+    grads = tensor.grad.abs().squeeze(0).max(dim=0).values
+    tensor.grad.zero_()
+    return _tensor_to_heatmap(grads)
+
+
+def _compute_activation_heatmap(capture: LayerCapture) -> np.ndarray:
+    if capture.activations is None:
+        return np.zeros((1, 1))
+    activation = capture.activations.detach().squeeze(0)
+    heatmap = activation.abs().mean(dim=0)
+    return _tensor_to_heatmap(heatmap)
+
+
+def _compute_cam_heatmap(model: torch.nn.Module, capture: LayerCapture, class_idx: int) -> np.ndarray:
+    if capture.activations is None:
+        return np.zeros((1, 1))
+    weights = model.fc.weight[class_idx].detach()
+    activation = capture.activations.detach().squeeze(0)
+    cam = (weights[:, None, None] * activation).sum(dim=0)
+    return _tensor_to_heatmap(torch.relu(cam))
+
+
+def _compute_gradcam_heatmap(model: torch.nn.Module, logits: torch.Tensor, capture: LayerCapture, class_idx: int) -> np.ndarray:
+    if capture.activations is None:
+        return np.zeros((1, 1))
+    model.zero_grad(set_to_none=True)
+    score = logits[0, class_idx]
+    score.backward()
+    if capture.gradients is None:
+        return np.zeros((1, 1))
+    gradients = capture.gradients.detach()
+    weights = gradients.mean(dim=(2, 3), keepdim=True)
+    cam = (weights * capture.activations).sum(dim=1).squeeze(0)
+    return _tensor_to_heatmap(torch.relu(cam))
+
+
+def _compute_occlusion_heatmap(
+    model: torch.nn.Module,
+    tensor: torch.Tensor,
+    class_idx: int,
+    base_prob: float,
+    patch_size: int,
+    stride: int,
+) -> np.ndarray:
+    h, w = tensor.shape[-2:]
+    device = tensor.device
+    heatmap = torch.zeros((h, w), device=device)
+    baseline = tensor.mean()
+    with torch.no_grad():
+        for y in range(0, h, stride):
+            for x in range(0, w, stride):
+                y_end = min(y + patch_size, h)
+                x_end = min(x + patch_size, w)
+                occluded = tensor.clone()
+                occluded[..., y:y_end, x:x_end] = baseline
+                probs = torch.softmax(model(occluded), dim=1)
+                drop = base_prob - probs[0, class_idx].item()
+                if drop < 0:
+                    drop = 0
+                heatmap[y:y_end, x:x_end] = drop
+    return _tensor_to_heatmap(heatmap)
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,6 +166,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scale", type=float, default=0.4, help="Downscale factor for landmark detection.")
     parser.add_argument("--skip-frames", type=int, default=2, help="Skip frames between landmark detections.")
     parser.add_argument("--show", action="store_true", help="Show the processed frames during video processing.")
+    parser.add_argument(
+        "--explain",
+        choices=EXPLAIN_METHODS,
+        help="Overlay an explanation heatmap for the detected face (saliency, activations, occlusion, CAM, GradCAM).",
+    )
+    parser.add_argument(
+        "--occlusion-patch",
+        type=int,
+        default=8,
+        help="Patch size (in transformed pixels) for occlusion sensitivity.",
+    )
+    parser.add_argument(
+        "--occlusion-stride",
+        type=int,
+        default=4,
+        help="Stride (in transformed pixels) between occlusion patches.",
+    )
     return parser.parse_args()
 
 
@@ -111,6 +247,9 @@ def main() -> None:
     model = build_model(args.weights, device, logger=LOGGER)
     fa_device = "cuda" if device.type == "cuda" else "cpu"
     fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, flip_input=False, device=fa_device)
+    capture: Optional[LayerCapture] = None
+    if args.explain in {"activations", "cam", "gradcam"}:
+        capture = LayerCapture(model.layer4)
 
     cap = open_capture(args)
     writer = None
@@ -155,12 +294,38 @@ def main() -> None:
                 if crop.size > 0:
                     pil_crop = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
                     tensor = INPUT_TRANSFORM(pil_crop).unsqueeze(0).to(device)
-                    with torch.no_grad():
+                    grad_enabled = args.explain in {"saliency", "gradcam"}
+                    if grad_enabled:
+                        tensor.requires_grad_(True)
+                    with torch.set_grad_enabled(grad_enabled):
                         logits = model(tensor)
-                        probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
-                        pred_idx = int(np.argmax(probs))
-                        label = EMOTION_LABELS[pred_idx]
-                        draw_overlay(frame, probs, label, ((x1, y1), (x2, y2)))
+                        softmax = torch.softmax(logits, dim=1)
+                    probs = softmax.squeeze(0).detach().cpu().numpy()
+                    pred_idx = int(np.argmax(probs))
+                    label = EMOTION_LABELS[pred_idx]
+                    if args.explain:
+                        heatmap: Optional[np.ndarray] = None
+                        if args.explain == "saliency":
+                            heatmap = _compute_saliency_heatmap(model, logits, tensor, pred_idx)
+                        elif args.explain == "activations" and capture:
+                            heatmap = _compute_activation_heatmap(capture)
+                        elif args.explain == "cam" and capture:
+                            heatmap = _compute_cam_heatmap(model, capture, pred_idx)
+                        elif args.explain == "gradcam" and capture:
+                            heatmap = _compute_gradcam_heatmap(model, logits, capture, pred_idx)
+                            capture.reset()
+                        elif args.explain == "occlusion":
+                            heatmap = _compute_occlusion_heatmap(
+                                model,
+                                tensor,
+                                pred_idx,
+                                softmax[0, pred_idx].item(),
+                                args.occlusion_patch,
+                                args.occlusion_stride,
+                            )
+                        if heatmap is not None:
+                            _overlay_heatmap(frame, ((x1, y1), (x2, y2)), heatmap)
+                    draw_overlay(frame, probs, label, ((x1, y1), (x2, y2)))
 
             if writer:
                 writer.write(frame)
