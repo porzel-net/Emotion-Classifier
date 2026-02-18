@@ -5,3 +5,4 @@ pillow
 torch
 torchvision
 tensorflow>=2.14
+matplotlib
