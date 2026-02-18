@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import logging
 import random
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Iterable, Optional
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -37,6 +40,7 @@ IMAGE_SIZE = 64
 NUM_CLASSES = len(CLASS_ORDER)
 DEFAULT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
 DEFAULT_ROOT = Path("data/emotion-classifier-dataset")
+DEFAULT_METADATA = DEFAULT_ROOT / "metadata.csv"
 
 FILTER_TRANSFORMS = {
     "sobel": transforms.Lambda(apply_sobel_to_pil),
@@ -79,6 +83,7 @@ class EmotionResNet(nn.Module):
         layers: Iterable[int],
         num_classes: int,
         width_multiplier: float = 1.0,
+        landmark_dim: int = 0,
     ):
         super().__init__()
         self.width_multiplier = max(0.25, width_multiplier)
@@ -101,9 +106,11 @@ class EmotionResNet(nn.Module):
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.dropout = nn.Dropout(p=0.35)
-        self.fc = nn.Linear(scaled_channels[-1], num_classes)
+        self.landmark_dim = max(0, landmark_dim)
+        self.fc_input_dim = scaled_channels[-1] + self.landmark_dim
+        self.fc = nn.Linear(self.fc_input_dim, num_classes)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, landmarks: Optional[torch.Tensor] = None) -> torch.Tensor:
         x = self.act(self.bn1(self.conv1(x)))
         x = self.maxpool(x)
         x = self.layer1(x)
@@ -111,9 +118,13 @@ class EmotionResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.dropout(x)
-        return self.fc(x)
+        features = torch.flatten(x, 1)
+        if self.landmark_dim > 0:
+            if landmarks is None:
+                landmarks = torch.zeros(x.size(0), self.landmark_dim, device=x.device)
+            features = torch.cat([features, landmarks], dim=1)
+        features = self.dropout(features)
+        return self.fc(features)
 
     def _make_layer(self, block: type[Block], out_channels: int, blocks: int, stride: int = 1) -> nn.Sequential:
         downsample: nn.Module | None = None
@@ -199,6 +210,73 @@ def build_transforms(
     return transforms.Compose(train_ops), transforms.Compose(eval_ops)
 
 
+def _metadata_key(path: Path, base_root: Path) -> str:
+    try:
+        rel = path.relative_to(base_root)
+    except ValueError:
+        rel = path
+    return rel.as_posix()
+
+
+def load_landmark_metadata(metadata_file: Path, base_root: Path) -> tuple[dict[str, np.ndarray], int]:
+    if not metadata_file.exists():
+        logging.warning("Landmark metadata %s missing; skipping landmark features", metadata_file)
+        return {}, 0
+
+    landmarks_map: dict[str, np.ndarray] = {}
+    landmark_dim = 0
+    with metadata_file.open("r", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            relative_path = row.get("image_path")
+            raw = row.get("landmarks")
+            if not relative_path or not raw:
+                continue
+            try:
+                coords = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            array = np.array(coords, dtype=np.float32).reshape(-1)
+            if array.size == 0:
+                continue
+            landmarks_map[relative_path.replace("\\", "/")] = array
+            landmark_dim = array.size
+    if landmark_dim == 0:
+        logging.warning("No landmarks parsed from %s", metadata_file)
+    return landmarks_map, landmark_dim
+
+
+class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
+    def __init__(
+        self,
+        root: str | Path,
+        transform: Optional[transforms.Compose],
+        metadata_map: dict[str, np.ndarray],
+        metadata_root: Path,
+        landmark_dim: int,
+    ):
+        super().__init__(root=root, transform=transform)
+        self.metadata_map = metadata_map
+        self.metadata_root = metadata_root
+        self.landmark_dim = max(0, landmark_dim)
+
+    def _lookup_landmarks(self, path: str) -> torch.Tensor:
+        key = _metadata_key(Path(path), self.metadata_root)
+        vector = self.metadata_map.get(key)
+        if vector is None or vector.size == 0:
+            return torch.zeros(self.landmark_dim, dtype=torch.float32)
+        return torch.from_numpy(vector)
+
+    def __getitem__(self, index: int):
+        image, label, path = super().__getitem__(index)
+        landmarks = (
+            self._lookup_landmarks(path)
+            if self.landmark_dim > 0
+            else torch.zeros(0, dtype=torch.float32)
+        )
+        return image, label, landmarks
+
+
 def _count_targets(dataset: EmotionFolderWithPaths | Subset) -> Counter[int]:
     if isinstance(dataset, Subset):
         return Counter(dataset.dataset.targets[idx] for idx in dataset.indices)
@@ -233,7 +311,10 @@ def _split_dataset(dataset: EmotionFolderWithPaths | Subset, split: float) -> tu
     return train_subset, val_subset
 
 
-def build_dataloaders(args: argparse.Namespace, device: torch.device) -> tuple[DataLoader, Optional[DataLoader], DataLoader, Counter[int]]:
+def build_dataloaders(
+    args: argparse.Namespace,
+    device: torch.device,
+) -> tuple[DataLoader, Optional[DataLoader], DataLoader, Counter[int], int]:
     train_transform, eval_transform = build_transforms(
         args.filter,
         args.augment_rotation,
@@ -243,7 +324,22 @@ def build_dataloaders(args: argparse.Namespace, device: torch.device) -> tuple[D
         args.noise_std,
     )
 
-    train_dataset = EmotionFolderWithPaths(root=args.data_root / "train", transform=train_transform)
+    metadata_map: dict[str, np.ndarray] = {}
+    landmark_dim = 0
+    if args.use_landmarks:
+        metadata_map, landmark_dim = load_landmark_metadata(args.metadata_file, args.data_root)
+    use_landmarks = args.use_landmarks and landmark_dim > 0
+
+    if use_landmarks:
+        train_dataset = LandmarkAwareEmotionFolder(
+            root=args.data_root / "train",
+            transform=train_transform,
+            metadata_map=metadata_map,
+            metadata_root=args.data_root,
+            landmark_dim=landmark_dim,
+        )
+    else:
+        train_dataset = EmotionFolderWithPaths(root=args.data_root / "train", transform=train_transform)
     filter_classes(train_dataset)
 
     if args.sampling == "undersample":
@@ -275,7 +371,16 @@ def build_dataloaders(args: argparse.Namespace, device: torch.device) -> tuple[D
         else None
     )
 
-    test_dataset = EmotionFolderWithPaths(root=args.data_root / "test", transform=eval_transform)
+    if use_landmarks:
+        test_dataset = LandmarkAwareEmotionFolder(
+            root=args.data_root / "test",
+            transform=eval_transform,
+            metadata_map=metadata_map,
+            metadata_root=args.data_root,
+            landmark_dim=landmark_dim,
+        )
+    else:
+        test_dataset = EmotionFolderWithPaths(root=args.data_root / "test", transform=eval_transform)
     filter_classes(test_dataset)
     test_loader = DataLoader(
         dataset=test_dataset,
@@ -285,7 +390,7 @@ def build_dataloaders(args: argparse.Namespace, device: torch.device) -> tuple[D
         pin_memory=pin_memory,
     )
 
-    return train_loader, val_loader, test_loader, sampled_counts
+    return train_loader, val_loader, test_loader, sampled_counts, landmark_dim
 
 
 def compute_class_weights(counts: Counter[int]) -> Optional[torch.Tensor]:
@@ -316,6 +421,12 @@ def compute_loss(logits: torch.Tensor, targets: torch.Tensor, criterion: nn.Modu
     return criterion(logits, targets)
 
 
+def _prepare_batch(batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor]):
+    inputs, targets = batch[:2]
+    landmarks = batch[2] if len(batch) > 2 else None
+    return inputs, targets, landmarks
+
+
 def train_one_epoch(
     model: nn.Module,
     loader: DataLoader,
@@ -330,11 +441,13 @@ def train_one_epoch(
     total_samples = 0
     progress = tqdm(loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
     for batch in progress:
-        inputs, targets = batch[:2]
+        inputs, targets, landmarks = _prepare_batch(batch)
         inputs = inputs.to(device)
         targets = targets.to(device)
+        if landmarks is not None:
+            landmarks = landmarks.to(device)
 
-        logits = model(inputs)
+        logits = model(inputs, landmarks)
         loss = compute_loss(logits, targets, criterion)
 
         optimizer.zero_grad()
@@ -363,11 +476,13 @@ def evaluate(
 
     with torch.no_grad():
         for batch in loader:
-            inputs, targets = batch[:2]
+            inputs, targets, landmarks = _prepare_batch(batch)
             inputs = inputs.to(device)
             targets = targets.to(device)
+            if landmarks is not None:
+                landmarks = landmarks.to(device)
 
-            logits = model(inputs)
+            logits = model(inputs, landmarks)
             loss = compute_loss(logits, targets, criterion)
 
             running_loss += loss.item() * inputs.size(0)
@@ -467,6 +582,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--noise-std", type=float, default=0.02, help="Standard deviation for Gaussian noise augmentation.")
     parser.add_argument("--val-split", type=float, default=0.1, help="Fraction of train set held out for validation.")
     parser.add_argument("--loss", choices=["ce", "mse"], default="ce", help="Loss function used during training.")
+    parser.add_argument("--use-landmarks", action="store_true", help="Augment batches with metadata landmarks.")
+    parser.add_argument(
+        "--metadata-file",
+        type=Path,
+        default=DEFAULT_METADATA,
+        help="CSV containing landmark annotations.",
+    )
     parser.add_argument("--device", type=str, default=None, help="Override training device (cuda/cpu/mps).")
     parser.add_argument(
         "--width-multiplier",
@@ -513,13 +635,14 @@ def main() -> None:
         torch.cuda.manual_seed_all(RANDOM_SEED)
 
     logging.info(
-        "Loading data from %s (filter=%s, sampling=%s, width=%.2f)",
+        "Loading data from %s (filter=%s, sampling=%s, width=%.2f, landmarks=%s)",
         args.data_root,
         args.filter,
         args.sampling,
         args.width_multiplier,
+        args.use_landmarks,
     )
-    train_loader, val_loader, test_loader, class_counts = build_dataloaders(args, device)
+    train_loader, val_loader, test_loader, class_counts, landmark_dim = build_dataloaders(args, device)
     logging.info("Class counts after sampling: %s", _describe_counts(class_counts))
     _loader_summary("Train", train_loader)
     if val_loader:
@@ -531,6 +654,7 @@ def main() -> None:
         [2, 2, 2, 2],
         NUM_CLASSES,
         width_multiplier=args.width_multiplier,
+        landmark_dim=landmark_dim if args.use_landmarks else 0,
     ).to(device)
     log_model_summary(model)
 
