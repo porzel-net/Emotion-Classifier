@@ -41,6 +41,7 @@ NUM_CLASSES = len(CLASS_ORDER)
 DEFAULT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
 DEFAULT_ROOT = Path("data/emotion-classifier-dataset")
 DEFAULT_METADATA = DEFAULT_ROOT / "metadata.csv"
+MODEL_DIR = Path("models")
 
 FILTER_TRANSFORMS = {
     "sobel": transforms.Lambda(apply_sobel_to_pil),
@@ -642,6 +643,7 @@ def main() -> None:
         args.width_multiplier,
         args.use_landmarks,
     )
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
     train_loader, val_loader, test_loader, class_counts, landmark_dim = build_dataloaders(args, device)
     logging.info("Class counts after sampling: %s", _describe_counts(class_counts))
     _loader_summary("Train", train_loader)
@@ -670,6 +672,7 @@ def main() -> None:
         args.scheduler,
         args.loss,
     )
+    best_val_accuracy = -1.0
     for epoch in range(args.epochs):
         logging.info("Epoch %d/%d — training", epoch + 1, args.epochs)
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, epoch, args.epochs, device)
@@ -710,6 +713,12 @@ def main() -> None:
                 val_metrics["accuracy"],
                 val_metrics["f1"],
             )
+            val_acc = val_metrics["accuracy"]
+            if val_acc > best_val_accuracy:
+                best_val_accuracy = val_acc
+                checkpoint = MODEL_DIR / f"emotion-classifier-step{epoch+1}.pth"
+                torch.save(model.state_dict(), checkpoint)
+                logging.info("Saved improved model to %s (val acc %.2f%%)", checkpoint, val_acc)
 
     logging.info(
         "Final evaluation | Precision=%.4f Recall=%.4f Macro-F1=%.4f",
