@@ -88,6 +88,55 @@ def parse_args() -> argparse.Namespace:
         default=0.1,
         help="Maximum translation relative to width/height for augmentation.",
     )
+    parser.add_argument(
+        "--noise-prob",
+        type=float,
+        default=0.5,
+        help="Probability of adding gaussian noise to each augmentation (0 to disable).",
+    )
+    parser.add_argument(
+        "--noise-scale",
+        type=float,
+        default=0.02,
+        help="Standard deviation of gaussian noise added during augmentation.",
+    )
+    parser.add_argument(
+        "--standardize",
+        dest="standardize",
+        action="store_true",
+        help="Enable pixel standardization before training (default).",
+    )
+    parser.add_argument(
+        "--no-standardize",
+        dest="standardize",
+        action="store_false",
+        help="Skip pixel standardization and train on raw [0,1] inputs.",
+    )
+    parser.set_defaults(standardize=True)
+    parser.add_argument(
+        "--reduce-lr",
+        choices=("plateau", "none"),
+        default="plateau",
+        help="Control the learning rate scheduler applied during training.",
+    )
+    parser.add_argument(
+        "--reduce-lr-factor",
+        type=float,
+        default=0.5,
+        help="Multiplicative factor for ReduceLROnPlateau (if used).",
+    )
+    parser.add_argument(
+        "--reduce-lr-patience",
+        type=int,
+        default=3,
+        help="Number of epochs with no improvement before reducing LR.",
+    )
+    parser.add_argument(
+        "--reduce-lr-min-lr",
+        type=float,
+        default=1e-6,
+        help="Minimum learning rate for ReduceLROnPlateau (if used).",
+    )
     return parser.parse_args()
 
 
@@ -133,6 +182,8 @@ def augment_dataset(
     max_rotation: float,
     min_scale: float,
     max_translation: float,
+    noise_prob: float,
+    noise_scale: float,
     seed: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Add slightly rotated and smaller versions of the dataset for diversity."""
@@ -166,8 +217,8 @@ def augment_dataset(
                 fill_mode="reflect",
                 cval=0.0,
             )
-            if rng.uniform() < 0.5:
-                noise = rng.normal(loc=0.0, scale=0.02, size=image.shape)
+            if noise_prob > 0 and rng.uniform() < noise_prob:
+                noise = rng.normal(loc=0.0, scale=noise_scale, size=image.shape)
                 augmented_image = np.clip(augmented_image + noise, 0.0, 1.0)
             augmented_images.append(augmented_image)
             translation = np.array([shift_x, shift_y], dtype=np.float32)
@@ -253,10 +304,17 @@ def main() -> None:
         max_rotation=args.max_rotation,
         min_scale=args.min_scale,
         max_translation=args.max_translation,
+        noise_prob=args.noise_prob,
+        noise_scale=args.noise_scale,
         seed=args.seed,
     )
-    train_images, mean, std = standardize_images(train_images)
-    val_images, _, _ = standardize_images(val_images, mean, std)
+    if args.standardize:
+        train_images, mean, std = standardize_images(train_images)
+        val_images, _, _ = standardize_images(val_images, mean, std)
+    else:
+        channel_dim = train_images.shape[-1]
+        mean = np.zeros((1, 1, channel_dim), dtype=np.float32)
+        std = np.ones((1, 1, channel_dim), dtype=np.float32)
 
     stats_path = args.output.parent / "landmarks_stats.npz"
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -280,20 +338,25 @@ def main() -> None:
         save_best_only=True,
         verbose=1,
     )
-    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
-        monitor="val_loss",
-        factor=0.5,
-        patience=3,
-        min_lr=1e-6,
-        verbose=1,
-    )
+    callbacks: list[tf.keras.callbacks.Callback] = [checkpoint]
+    if args.reduce_lr == "plateau":
+        callbacks.append(
+            tf.keras.callbacks.ReduceLROnPlateau(
+                monitor="val_loss",
+                factor=args.reduce_lr_factor,
+                patience=args.reduce_lr_patience,
+                min_lr=args.reduce_lr_min_lr,
+                verbose=1,
+            )
+        )
     lr_logger = LearningRatePrinter()
+    callbacks.append(lr_logger)
 
     model.fit(
         train_ds,
         epochs=args.epochs,
         validation_data=val_ds,
-        callbacks=[checkpoint, reduce_lr, lr_logger],
+        callbacks=callbacks,
         verbose=1,
     )
 
