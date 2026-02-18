@@ -77,6 +77,118 @@ class Block(nn.Module):
         return self.act(out)
 
 
+class LandmarkHeatmapGenerator(nn.Module):
+    def __init__(
+        self,
+        num_landmarks: int,
+        image_size: int,
+        sigmas: Iterable[float] = (1.0, 2.0, 4.0),
+    ) -> None:
+        super().__init__()
+        self.image_size = image_size
+        self.num_landmarks = max(1, num_landmarks)
+        self.sigmas = tuple(sigmas)
+
+    def forward(self, landmarks: torch.Tensor) -> torch.Tensor:
+        if landmarks.numel() == 0:
+            return torch.zeros(
+                landmarks.size(0),
+                len(self.sigmas),
+                self.image_size,
+                self.image_size,
+                device=landmarks.device,
+                dtype=landmarks.dtype,
+            )
+
+        coords = landmarks.view(landmarks.size(0), -1, 2)
+        coords = coords.clamp(min=0.0, max=float(self.image_size - 1))
+        xs = torch.arange(self.image_size, device=coords.device, dtype=coords.dtype).view(1, 1, 1, self.image_size)
+        ys = torch.arange(self.image_size, device=coords.device, dtype=coords.dtype).view(1, 1, self.image_size, 1)
+        x_coords = coords[..., 0].unsqueeze(-1).unsqueeze(-1)
+        y_coords = coords[..., 1].unsqueeze(-1).unsqueeze(-1)
+
+        heatmaps: list[torch.Tensor] = []
+        for sigma in self.sigmas:
+            dist_sq = (xs - x_coords) ** 2 + (ys - y_coords) ** 2
+            gauss = torch.exp(-dist_sq / (2 * sigma * sigma + 1e-6))
+            heatmaps.append(torch.sum(gauss, dim=1, keepdim=True))
+
+        stacked = torch.cat(heatmaps, dim=1)
+        return stacked.clamp_max(1.0)
+
+
+class LandmarkAttentionFusion(nn.Module):
+    def __init__(self, num_heatmaps: int, image_channels: int = 1, base_channels: int = 16):
+        super().__init__()
+        self.fusion = nn.Sequential(
+            nn.Conv2d(image_channels + num_heatmaps, base_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(base_channels),
+            nn.SiLU(),
+            nn.Conv2d(base_channels, image_channels, kernel_size=3, padding=1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, image: torch.Tensor, heatmaps: torch.Tensor) -> torch.Tensor:
+        fused = torch.cat([image, heatmaps], dim=1)
+        attention = self.fusion(fused)
+        return image * (1.0 + attention)
+
+
+class LandmarkGuidedAttention(nn.Module):
+    def __init__(
+        self,
+        landmark_dim: int,
+        image_size: int,
+        image_channels: int = 1,
+        base_channels: int = 16,
+        feature_dim: int = 32,
+    ):
+        super().__init__()
+        self.num_landmarks = max(1, landmark_dim // 2)
+        self.generator = LandmarkHeatmapGenerator(self.num_landmarks, image_size)
+        self.heatmap_channels = len(self.generator.sigmas)
+        self.attention = LandmarkAttentionFusion(
+            num_heatmaps=self.heatmap_channels,
+            image_channels=image_channels,
+            base_channels=base_channels,
+        )
+        self.feature_dim = max(0, feature_dim)
+        if self.feature_dim > 0:
+            fusion_channels = image_channels + self.heatmap_channels
+            self.feature_branch = nn.Sequential(
+                nn.Conv2d(fusion_channels, base_channels, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(base_channels),
+                nn.SiLU(),
+                nn.Conv2d(base_channels, self.feature_dim, kernel_size=1),
+            )
+            self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        else:
+            self.feature_branch = None
+            self.pool = None
+
+    def forward(self, image: torch.Tensor, landmarks: torch.Tensor | None) -> tuple[torch.Tensor, torch.Tensor | None]:
+        if landmarks is None or landmarks.numel() == 0:
+            branch_features = (
+                torch.zeros(
+                    image.size(0),
+                    self.feature_dim,
+                    device=image.device,
+                    dtype=image.dtype,
+                )
+                if self.feature_branch is not None
+                else None
+            )
+            return image, branch_features
+
+        heatmaps = self.generator(landmarks)
+        attended = self.attention(image, heatmaps)
+        branch_features = None
+        if self.feature_branch is not None and self.pool is not None:
+            fused = torch.cat([image, heatmaps], dim=1)
+            branch_features = self.pool(self.feature_branch(fused)).view(image.size(0), -1)
+        return attended, branch_features
+
+
 class EmotionResNet(nn.Module):
     def __init__(
         self,
@@ -108,10 +220,20 @@ class EmotionResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.dropout = nn.Dropout(p=0.35)
         self.landmark_dim = max(0, landmark_dim)
+        self.landmark_attention: LandmarkGuidedAttention | None = None
+        self.landmark_branch_dim = 0
+        if self.landmark_dim > 0:
+            self.landmark_attention = LandmarkGuidedAttention(self.landmark_dim, IMAGE_SIZE)
+            self.landmark_branch_dim = self.landmark_attention.feature_dim
         self.fc_input_dim = scaled_channels[-1] + self.landmark_dim
+        if self.landmark_branch_dim:
+            self.fc_input_dim += self.landmark_branch_dim
         self.fc = nn.Linear(self.fc_input_dim, num_classes)
 
     def forward(self, x: torch.Tensor, landmarks: Optional[torch.Tensor] = None) -> torch.Tensor:
+        branch_features: torch.Tensor | None = None
+        if self.landmark_attention is not None:
+            x, branch_features = self.landmark_attention(x, landmarks)
         x = self.act(self.bn1(self.conv1(x)))
         x = self.maxpool(x)
         x = self.layer1(x)
@@ -124,6 +246,8 @@ class EmotionResNet(nn.Module):
             if landmarks is None:
                 landmarks = torch.zeros(x.size(0), self.landmark_dim, device=x.device)
             features = torch.cat([features, landmarks], dim=1)
+        if branch_features is not None:
+            features = torch.cat([features, branch_features], dim=1)
         features = self.dropout(features)
         return self.fc(features)
 
