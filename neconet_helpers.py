@@ -64,22 +64,57 @@ def trim_dataset(dataset: EmotionFolderWithPaths, max_samples: Optional[int] = N
     dataset.imgs = trimmed
 
 
-def apply_sobel(image: np.ndarray) -> np.ndarray:
+def _to_grayscale(image: np.ndarray) -> np.ndarray:
     if image.ndim == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image
+        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return image
+
+
+def _normalize_edge(map_: np.ndarray) -> np.ndarray:
+    normalized = cv2.normalize(map_, None, 0, 255, cv2.NORM_MINMAX)
+    return normalized.astype(np.uint8)
+
+
+def apply_sobel(image: np.ndarray) -> np.ndarray:
+    gray = _to_grayscale(image)
     grad_x = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
     grad_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
     magnitude = cv2.magnitude(grad_x, grad_y)
-    normalized = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
-    return normalized.astype(np.uint8)
+    return _normalize_edge(magnitude)
+
+
+def apply_roberts(image: np.ndarray) -> np.ndarray:
+    gray = _to_grayscale(image)
+    kernel_x = np.array([[1, 0], [0, -1]], dtype=np.float32)
+    kernel_y = np.array([[0, 1], [-1, 0]], dtype=np.float32)
+    grad_x = cv2.filter2D(gray, cv2.CV_32F, kernel_x)
+    grad_y = cv2.filter2D(gray, cv2.CV_32F, kernel_y)
+    magnitude = cv2.magnitude(grad_x, grad_y)
+    return _normalize_edge(magnitude)
+
+
+def apply_laplacian(image: np.ndarray) -> np.ndarray:
+    gray = _to_grayscale(image)
+    lap = cv2.Laplacian(gray, cv2.CV_32F, ksize=3)
+    return _normalize_edge(np.abs(lap))
 
 
 def apply_sobel_to_pil(image: Image.Image) -> Image.Image:
     array = np.array(image)
     sobel_array = apply_sobel(array)
     return Image.fromarray(sobel_array)
+
+
+def apply_roberts_to_pil(image: Image.Image) -> Image.Image:
+    array = np.array(image)
+    roberts_array = apply_roberts(array)
+    return Image.fromarray(roberts_array)
+
+
+def apply_laplacian_to_pil(image: Image.Image) -> Image.Image:
+    array = np.array(image)
+    laplacian_array = apply_laplacian(array)
+    return Image.fromarray(laplacian_array)
 
 
 def build_transform(sobel: bool = False) -> transforms.Compose:
