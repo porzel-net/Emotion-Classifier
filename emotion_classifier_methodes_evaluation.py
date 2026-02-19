@@ -6,6 +6,7 @@ import argparse
 import csv
 import json
 import logging
+import math
 import random
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -15,9 +16,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from PIL import Image
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Subset, random_split
 from torchvision import transforms
+from torchvision.transforms import functional as TF
 from tqdm import tqdm
 
 from neconet_helpers import (
@@ -332,6 +335,7 @@ def build_transforms(
     augment_rotation: bool,
     augment_scale: bool,
     augment_translation: bool,
+    augment_perspective: bool,
     augment_noise: bool,
     noise_std: float,
 ) -> tuple[transforms.Compose, transforms.Compose]:
@@ -353,6 +357,10 @@ def build_transforms(
 
     if augment_translation:
         train_ops.append(transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)))
+
+    if augment_perspective:
+        train_ops.append(transforms.RandomPerspective(distortion_scale=0.18, p=0.4))
+        train_ops.append(transforms.RandomAffine(degrees=0, shear=(-8, 8, -4, 4)))
 
     train_ops.extend(
         [
@@ -429,11 +437,28 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
         metadata_map: dict[str, np.ndarray],
         metadata_root: Path,
         landmark_dim: int,
+        *,
+        filter_name: str,
+        augment_rotation: bool,
+        augment_scale: bool,
+        augment_translation: bool,
+        augment_perspective: bool,
+        augment_noise: bool,
+        noise_std: float,
+        train_mode: bool,
     ):
         super().__init__(root=root, transform=transform)
         self.metadata_map = metadata_map
         self.metadata_root = metadata_root
         self.landmark_dim = max(0, landmark_dim)
+        self.filter_transform = FILTER_TRANSFORMS.get(filter_name)
+        self.augment_rotation = augment_rotation and train_mode
+        self.augment_scale = augment_scale and train_mode
+        self.augment_translation = augment_translation and train_mode
+        self.augment_perspective = augment_perspective and train_mode
+        self.augment_noise = augment_noise and train_mode
+        self.noise_std = noise_std
+        self.train_mode = train_mode
 
     def _lookup_landmarks(self, path: str) -> torch.Tensor:
         key = _metadata_key(Path(path), self.metadata_root)
@@ -442,10 +467,174 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
             return torch.zeros(self.landmark_dim, dtype=torch.float32)
         return torch.from_numpy(vector)
 
+    @staticmethod
+    def _to_pixel_landmarks(landmarks: torch.Tensor, width: int, height: int) -> tuple[np.ndarray, bool]:
+        if landmarks.numel() == 0:
+            return np.zeros((0, 2), dtype=np.float32), True
+        coords = landmarks.view(-1, 2).cpu().numpy().astype(np.float32)
+        is_normalized = bool(np.max(np.abs(coords)) <= 1.5)
+        if is_normalized:
+            coords[:, 0] *= float(width)
+            coords[:, 1] *= float(height)
+        return coords, is_normalized
+
+    @staticmethod
+    def _from_pixel_landmarks(coords: np.ndarray, normalized: bool, width: int, height: int) -> torch.Tensor:
+        if coords.size == 0:
+            return torch.zeros(0, dtype=torch.float32)
+        out = coords.copy()
+        if normalized:
+            out[:, 0] /= max(float(width), 1.0)
+            out[:, 1] /= max(float(height), 1.0)
+        out[:, 0] = np.clip(out[:, 0], 0.0, 1.0 if normalized else float(width - 1))
+        out[:, 1] = np.clip(out[:, 1], 0.0, 1.0 if normalized else float(height - 1))
+        return torch.from_numpy(out.reshape(-1).astype(np.float32))
+
+    @staticmethod
+    def _apply_homography(coords: np.ndarray, matrix: np.ndarray) -> np.ndarray:
+        if coords.size == 0:
+            return coords
+        ones = np.ones((coords.shape[0], 1), dtype=np.float32)
+        homo = np.concatenate([coords, ones], axis=1)
+        transformed = homo @ matrix.T
+        denom = np.clip(transformed[:, 2:3], 1e-6, None)
+        return transformed[:, :2] / denom
+
+    @staticmethod
+    def _build_perspective_matrix(src: list[list[float]], dst: list[list[float]]) -> np.ndarray:
+        src_pts = np.array(src, dtype=np.float32)
+        dst_pts = np.array(dst, dtype=np.float32)
+        rows = []
+        values = []
+        for (x, y), (u, v) in zip(src_pts, dst_pts):
+            rows.append([x, y, 1.0, 0.0, 0.0, 0.0, -u * x, -u * y])
+            rows.append([0.0, 0.0, 0.0, x, y, 1.0, -v * x, -v * y])
+            values.extend([u, v])
+        a = np.asarray(rows, dtype=np.float32)
+        b = np.asarray(values, dtype=np.float32)
+        params, *_ = np.linalg.lstsq(a, b, rcond=None)
+        h = np.array(
+            [
+                [params[0], params[1], params[2]],
+                [params[3], params[4], params[5]],
+                [params[6], params[7], 1.0],
+            ],
+            dtype=np.float32,
+        )
+        return h
+
+    @staticmethod
+    def _rotate(coords: np.ndarray, angle_deg: float, width: int, height: int) -> np.ndarray:
+        if coords.size == 0:
+            return coords
+        theta = math.radians(angle_deg)
+        cos_t = math.cos(theta)
+        sin_t = math.sin(theta)
+        cx = (width - 1) / 2.0
+        cy = (height - 1) / 2.0
+        shifted = coords - np.array([cx, cy], dtype=np.float32)
+        rot = np.empty_like(shifted)
+        rot[:, 0] = shifted[:, 0] * cos_t - shifted[:, 1] * sin_t
+        rot[:, 1] = shifted[:, 0] * sin_t + shifted[:, 1] * cos_t
+        return rot + np.array([cx, cy], dtype=np.float32)
+
+    @staticmethod
+    def _shear(coords: np.ndarray, shear_x_deg: float, shear_y_deg: float) -> np.ndarray:
+        if coords.size == 0:
+            return coords
+        shx = math.tan(math.radians(shear_x_deg))
+        shy = math.tan(math.radians(shear_y_deg))
+        out = np.empty_like(coords)
+        out[:, 0] = coords[:, 0] + shx * coords[:, 1]
+        out[:, 1] = coords[:, 1] + shy * coords[:, 0]
+        return out
+
+    def _apply_shared_transforms(self, image: Image.Image, landmarks: torch.Tensor) -> tuple[Image.Image, torch.Tensor]:
+        width, height = image.size
+        coords, was_normalized = self._to_pixel_landmarks(landmarks, width, height)
+
+        if self.augment_scale:
+            top, left, crop_h, crop_w = transforms.RandomResizedCrop.get_params(
+                image, scale=(0.8, 1.0), ratio=(3.0 / 4.0, 4.0 / 3.0)
+            )
+            image = TF.resized_crop(
+                image,
+                top=top,
+                left=left,
+                height=crop_h,
+                width=crop_w,
+                size=[IMAGE_SIZE, IMAGE_SIZE],
+            )
+            if coords.size:
+                coords[:, 0] = (coords[:, 0] - float(left)) * (IMAGE_SIZE / float(crop_w))
+                coords[:, 1] = (coords[:, 1] - float(top)) * (IMAGE_SIZE / float(crop_h))
+        else:
+            if (width, height) != (IMAGE_SIZE, IMAGE_SIZE):
+                image = TF.resize(image, [IMAGE_SIZE, IMAGE_SIZE])
+                if coords.size:
+                    coords[:, 0] *= IMAGE_SIZE / float(width)
+                    coords[:, 1] *= IMAGE_SIZE / float(height)
+
+        width, height = image.size
+
+        if self.augment_rotation:
+            angle = float(torch.empty(1).uniform_(-15.0, 15.0).item())
+            image = TF.rotate(image, angle=angle)
+            coords = self._rotate(coords, angle_deg=angle, width=width, height=height)
+
+        if self.augment_translation:
+            dx = int(round(float(torch.empty(1).uniform_(-0.1, 0.1).item() * width)))
+            dy = int(round(float(torch.empty(1).uniform_(-0.1, 0.1).item() * height)))
+            image = TF.affine(image, angle=0.0, translate=[dx, dy], scale=1.0, shear=[0.0, 0.0])
+            if coords.size:
+                coords[:, 0] += float(dx)
+                coords[:, 1] += float(dy)
+
+        if self.augment_perspective:
+            if random.random() < 0.4:
+                startpoints, endpoints = transforms.RandomPerspective.get_params(width, height, 0.18)
+                image = TF.perspective(image, startpoints=startpoints, endpoints=endpoints)
+                matrix = self._build_perspective_matrix(startpoints, endpoints)
+                coords = self._apply_homography(coords, matrix)
+
+            shear_x = float(torch.empty(1).uniform_(-8.0, 8.0).item())
+            shear_y = float(torch.empty(1).uniform_(-4.0, 4.0).item())
+            image = TF.affine(
+                image,
+                angle=0.0,
+                translate=[0, 0],
+                scale=1.0,
+                shear=[shear_x, shear_y],
+                center=[0.0, 0.0],
+            )
+            coords = self._shear(coords, shear_x_deg=shear_x, shear_y_deg=shear_y)
+
+        if self.train_mode and random.random() < 0.5:
+            image = TF.hflip(image)
+            if coords.size:
+                coords[:, 0] = (width - 1) - coords[:, 0]
+
+        landmarks_out = self._from_pixel_landmarks(coords, normalized=was_normalized, width=width, height=height)
+        return image, landmarks_out
+
     def __getitem__(self, index: int):
-        image, label, path = super().__getitem__(index)
+        path, label = self.samples[index]
+        image = self.loader(path)
         landmarks = (
             self._lookup_landmarks(path)
+            if self.landmark_dim > 0
+            else torch.zeros(0, dtype=torch.float32)
+        )
+        image, landmarks = self._apply_shared_transforms(image, landmarks)
+        if self.filter_transform:
+            image = self.filter_transform(image)
+        image = TF.grayscale(image, num_output_channels=1)
+        image = TF.to_tensor(image)
+        if self.augment_noise:
+            image = gaussian_noise(self.noise_std)(image)
+        image = TF.normalize(image, mean=(0.5,), std=(0.5,))
+        landmarks = (
+            landmarks
             if self.landmark_dim > 0
             else torch.zeros(0, dtype=torch.float32)
         )
@@ -495,6 +684,7 @@ def build_dataloaders(
         args.augment_rotation,
         args.augment_scale,
         args.augment_translation,
+        args.augment_perspective,
         args.augment_noise,
         args.noise_std,
     )
@@ -508,10 +698,18 @@ def build_dataloaders(
     if use_landmarks:
         train_dataset = LandmarkAwareEmotionFolder(
             root=args.data_root / "train",
-            transform=train_transform,
+            transform=None,
             metadata_map=metadata_map,
             metadata_root=args.data_root,
             landmark_dim=landmark_dim,
+            filter_name=args.filter,
+            augment_rotation=args.augment_rotation,
+            augment_scale=args.augment_scale,
+            augment_translation=args.augment_translation,
+            augment_perspective=args.augment_perspective,
+            augment_noise=args.augment_noise,
+            noise_std=args.noise_std,
+            train_mode=True,
         )
     else:
         train_dataset = EmotionFolderWithPaths(root=args.data_root / "train", transform=train_transform)
@@ -549,10 +747,18 @@ def build_dataloaders(
     if use_landmarks:
         test_dataset = LandmarkAwareEmotionFolder(
             root=args.data_root / "test",
-            transform=eval_transform,
+            transform=None,
             metadata_map=metadata_map,
             metadata_root=args.data_root,
             landmark_dim=landmark_dim,
+            filter_name=args.filter,
+            augment_rotation=False,
+            augment_scale=False,
+            augment_translation=False,
+            augment_perspective=False,
+            augment_noise=False,
+            noise_std=args.noise_std,
+            train_mode=False,
         )
     else:
         test_dataset = EmotionFolderWithPaths(root=args.data_root / "test", transform=eval_transform)
@@ -755,6 +961,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--augment-rotation", action="store_true", help="Add rotation augmentation.")
     parser.add_argument("--augment-scale", action="store_true", help="Add random resized crop (scale) augmentation.")
     parser.add_argument("--augment-translation", action="store_true", help="Add translation augmentation via RandomAffine.")
+    parser.add_argument(
+        "--augment-perspective",
+        action="store_true",
+        help="Add random perspective distortion and small affine shears.",
+    )
     parser.add_argument("--augment-noise", action="store_true", help="Add Gaussian noise to tensors.")
     parser.add_argument("--noise-std", type=float, default=0.02, help="Standard deviation for Gaussian noise augmentation.")
     parser.add_argument("--val-split", type=float, default=0.1, help="Fraction of train set held out for validation.")
@@ -816,6 +1027,8 @@ def main() -> None:
         augmentation_flags.append("scale")
     if args.augment_translation:
         augmentation_flags.append("translation")
+    if args.augment_perspective:
+        augmentation_flags.append("perspective+skew")
     if args.augment_noise:
         augmentation_flags.append(f"noise(std={args.noise_std})")
     aug_text = "none" if not augmentation_flags else ", ".join(augmentation_flags)
