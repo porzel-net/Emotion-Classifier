@@ -189,6 +189,36 @@ class LandmarkGuidedAttention(nn.Module):
         return attended, branch_features
 
 
+class LandmarkGNNBranch(nn.Module):
+    def __init__(self, landmark_dim: int, hidden_dim: int = 64, message_steps: int = 2) -> None:
+        super().__init__()
+        self.landmark_dim = max(0, landmark_dim)
+        self.hidden_dim = max(1, hidden_dim)
+        self.message_steps = max(1, message_steps)
+
+        self.node_proj = nn.Linear(2, self.hidden_dim)
+        self.message_lin = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.update_lin = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        self.pool = nn.AdaptiveAvgPool1d(1)
+
+    def forward(self, landmarks: torch.Tensor | None, batch_size: int, device: torch.device | None = None) -> torch.Tensor:
+        if landmarks is None or landmarks.numel() == 0:
+            target_device = device or (landmarks.device if landmarks is not None else torch.device("cpu"))
+            return torch.zeros(batch_size, self.hidden_dim, device=target_device)
+
+        nodes = landmarks.view(batch_size, -1, 2)
+        h = self.node_proj(nodes)
+        for _ in range(self.message_steps):
+            messages = F.silu(self.message_lin(h))
+            aggregated = messages.mean(dim=1, keepdim=True)
+            expanded = aggregated.expand(-1, nodes.size(1), -1)
+            h = F.silu(self.update_lin(torch.cat([h, expanded], dim=-1)))
+        pooled = self.pool(h.transpose(1, 2)).view(batch_size, self.hidden_dim)
+        return pooled
+
+
+
+
 class EmotionResNet(nn.Module):
     def __init__(
         self,
@@ -197,6 +227,9 @@ class EmotionResNet(nn.Module):
         num_classes: int,
         width_multiplier: float = 1.0,
         landmark_dim: int = 0,
+        use_gnn: bool = False,
+        gnn_hidden_dim: int = 64,
+        gnn_message_steps: int = 2,
     ):
         super().__init__()
         self.width_multiplier = max(0.25, width_multiplier)
@@ -225,9 +258,23 @@ class EmotionResNet(nn.Module):
         if self.landmark_dim > 0:
             self.landmark_attention = LandmarkGuidedAttention(self.landmark_dim, IMAGE_SIZE)
             self.landmark_branch_dim = self.landmark_attention.feature_dim
-        self.fc_input_dim = scaled_channels[-1] + self.landmark_dim
+        self.use_gnn = use_gnn and self.landmark_dim > 0
+        self.gnn_branch_dim = 0
+        self.gnn_branch: LandmarkGNNBranch | None = None
+        if self.use_gnn:
+            self.gnn_branch = LandmarkGNNBranch(
+                self.landmark_dim,
+                hidden_dim=gnn_hidden_dim,
+                message_steps=gnn_message_steps,
+            )
+            self.gnn_branch_dim = self.gnn_branch.hidden_dim
+        self.fc_input_dim = scaled_channels[-1]
+        if self.landmark_dim > 0:
+            self.fc_input_dim += self.landmark_dim
         if self.landmark_branch_dim:
             self.fc_input_dim += self.landmark_branch_dim
+        if self.gnn_branch_dim:
+            self.fc_input_dim += self.gnn_branch_dim
         self.fc = nn.Linear(self.fc_input_dim, num_classes)
 
     def forward(self, x: torch.Tensor, landmarks: Optional[torch.Tensor] = None) -> torch.Tensor:
@@ -248,6 +295,9 @@ class EmotionResNet(nn.Module):
             features = torch.cat([features, landmarks], dim=1)
         if branch_features is not None:
             features = torch.cat([features, branch_features], dim=1)
+        if self.gnn_branch is not None:
+            gnn_features = self.gnn_branch(landmarks, x.size(0), device=x.device)
+            features = torch.cat([features, gnn_features], dim=1)
         features = self.dropout(features)
         return self.fc(features)
 
@@ -710,6 +760,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val-split", type=float, default=0.1, help="Fraction of train set held out for validation.")
     parser.add_argument("--loss", choices=["ce", "mse"], default="ce", help="Loss function used during training.")
     parser.add_argument("--use-landmarks", action="store_true", help="Augment batches with metadata landmarks.")
+    parser.add_argument("--use-gnn", action="store_true", help="Enable the relational Landmark GNN branch.")
+    parser.add_argument("--gnn-hidden-dim", type=int, default=64, help="Hidden dimensionality for the GNN branch output.")
+    parser.add_argument("--gnn-steps", type=int, default=2, help="Message passing rounds for the GNN branch.")
     parser.add_argument(
         "--metadata-file",
         type=Path,
@@ -771,6 +824,24 @@ def main() -> None:
     )
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     train_loader, val_loader, test_loader, class_counts, landmark_dim = build_dataloaders(args, device)
+    gnn_requested = args.use_gnn
+    landmarks_requested = args.use_landmarks
+    landmark_features_available = landmark_dim > 0
+    gnn_active = gnn_requested and landmarks_requested and landmark_features_available
+    if gnn_requested and not landmarks_requested:
+        logging.warning("GNN branch requested but --use-landmarks is disabled; enable landmarks to activate the GNN.")
+    elif gnn_requested and not landmark_features_available:
+        logging.warning("GNN branch requested but landmark metadata could not be loaded; branch stays inactive.")
+    status = "active" if gnn_active else "inactive"
+    logging.info(
+        "GNN branch status: requested=%s landmarks=%s dim=%d -> %s (hidden=%d steps=%d)",
+        gnn_requested,
+        landmarks_requested,
+        landmark_dim,
+        status,
+        args.gnn_hidden_dim,
+        args.gnn_steps,
+    )
     logging.info("Class counts after sampling: %s", _describe_counts(class_counts))
     _loader_summary("Train", train_loader)
     if val_loader:
@@ -783,6 +854,9 @@ def main() -> None:
         NUM_CLASSES,
         width_multiplier=args.width_multiplier,
         landmark_dim=landmark_dim if args.use_landmarks else 0,
+        use_gnn=args.use_gnn,
+        gnn_hidden_dim=args.gnn_hidden_dim,
+        gnn_message_steps=args.gnn_steps,
     ).to(device)
     log_model_summary(model)
 
