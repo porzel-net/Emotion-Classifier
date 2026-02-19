@@ -809,6 +809,41 @@ def main() -> None:
     args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
+    augmentation_flags = []
+    if args.augment_rotation:
+        augmentation_flags.append("rotation")
+    if args.augment_scale:
+        augmentation_flags.append("scale")
+    if args.augment_translation:
+        augmentation_flags.append("translation")
+    if args.augment_noise:
+        augmentation_flags.append(f"noise(std={args.noise_std})")
+    aug_text = "none" if not augmentation_flags else ", ".join(augmentation_flags)
+    logging.info(
+        "Config: filter=%s, loss=%s, scheduler=%s%s, batch=%d, width=%.2f, val_split=%.2f",
+        args.filter,
+        args.loss,
+        args.scheduler,
+        f" (plateau patience={args.plateau_patience} factor={args.plateau_factor})"
+        if args.scheduler == "plateau"
+        else "",
+        args.batch_size,
+        args.width_multiplier,
+        args.val_split,
+    )
+    logging.info("Augmentations: %s", aug_text)
+    logging.info(
+        "Landmarks: %s metadata=%s",
+        "enabled" if args.use_landmarks else "disabled",
+        args.metadata_file,
+    )
+    logging.info(
+        "GNN branch request: %s (hidden=%d steps=%d)",
+        "on" if args.use_gnn else "off",
+        args.gnn_hidden_dim,
+        args.gnn_steps,
+    )
+
     device = torch.device(args.device) if args.device else DEFAULT_DEVICE
     torch.manual_seed(RANDOM_SEED)
     if device.type == "cuda":
@@ -859,6 +894,17 @@ def main() -> None:
         gnn_message_steps=args.gnn_steps,
     ).to(device)
     log_model_summary(model)
+    logging.info("Model architecture:\\n%s", model)
+    if model.landmark_attention is not None:
+        logging.info("Landmark attention shading: heatmap_channels=%d branch_feat_dim=%d",
+            model.landmark_attention.heatmap_channels,
+            model.landmark_attention.feature_dim,
+        )
+    if model.gnn_branch is not None:
+        logging.info("Landmark GNN branch: hidden_dim=%d message_steps=%d",
+            model.gnn_branch.hidden_dim,
+            model.gnn_branch.message_steps,
+        )
 
     criterion = build_loss_function(args, class_counts)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
