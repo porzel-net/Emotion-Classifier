@@ -336,6 +336,7 @@ def build_transforms(
     augment_scale: bool,
     augment_translation: bool,
     augment_perspective: bool,
+    augment_erasing: bool,
     augment_noise: bool,
     noise_std: float,
 ) -> tuple[transforms.Compose, transforms.Compose]:
@@ -369,6 +370,9 @@ def build_transforms(
             transforms.ToTensor(),
         ]
     )
+
+    if augment_erasing:
+        train_ops.append(transforms.RandomErasing(p=0.25, scale=(0.02, 0.12), ratio=(0.3, 3.3), value=0.0))
 
     if augment_noise:
         train_ops.append(gaussian_noise(noise_std))
@@ -443,6 +447,7 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
         augment_scale: bool,
         augment_translation: bool,
         augment_perspective: bool,
+        augment_erasing: bool,
         augment_noise: bool,
         noise_std: float,
         train_mode: bool,
@@ -456,6 +461,7 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
         self.augment_scale = augment_scale and train_mode
         self.augment_translation = augment_translation and train_mode
         self.augment_perspective = augment_perspective and train_mode
+        self.augment_erasing = augment_erasing and train_mode
         self.augment_noise = augment_noise and train_mode
         self.noise_std = noise_std
         self.train_mode = train_mode
@@ -630,6 +636,10 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
             image = self.filter_transform(image)
         image = TF.grayscale(image, num_output_channels=1)
         image = TF.to_tensor(image)
+        if self.augment_erasing:
+            image = transforms.RandomErasing(
+                p=0.25, scale=(0.02, 0.12), ratio=(0.3, 3.3), value=0.0
+            )(image)
         if self.augment_noise:
             image = gaussian_noise(self.noise_std)(image)
         image = TF.normalize(image, mean=(0.5,), std=(0.5,))
@@ -685,6 +695,7 @@ def build_dataloaders(
         args.augment_scale,
         args.augment_translation,
         args.augment_perspective,
+        args.augment_erasing,
         args.augment_noise,
         args.noise_std,
     )
@@ -707,6 +718,7 @@ def build_dataloaders(
             augment_scale=args.augment_scale,
             augment_translation=args.augment_translation,
             augment_perspective=args.augment_perspective,
+            augment_erasing=args.augment_erasing,
             augment_noise=args.augment_noise,
             noise_std=args.noise_std,
             train_mode=True,
@@ -756,6 +768,7 @@ def build_dataloaders(
             augment_scale=False,
             augment_translation=False,
             augment_perspective=False,
+            augment_erasing=False,
             augment_noise=False,
             noise_std=args.noise_std,
             train_mode=False,
@@ -966,6 +979,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Add random perspective distortion and small affine shears.",
     )
+    parser.add_argument(
+        "--augment-erasing",
+        action="store_true",
+        help="Add RandomErasing (cutout-style occlusion) on tensor images.",
+    )
     parser.add_argument("--augment-noise", action="store_true", help="Add Gaussian noise to tensors.")
     parser.add_argument("--noise-std", type=float, default=0.02, help="Standard deviation for Gaussian noise augmentation.")
     parser.add_argument("--val-split", type=float, default=0.1, help="Fraction of train set held out for validation.")
@@ -1029,6 +1047,8 @@ def main() -> None:
         augmentation_flags.append("translation")
     if args.augment_perspective:
         augmentation_flags.append("perspective+skew")
+    if args.augment_erasing:
+        augmentation_flags.append("random-erasing")
     if args.augment_noise:
         augmentation_flags.append(f"noise(std={args.noise_std})")
     aug_text = "none" if not augmentation_flags else ", ".join(augmentation_flags)
