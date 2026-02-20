@@ -222,6 +222,44 @@ class LandmarkGNNBranch(nn.Module):
 
 
 
+class SobelFeatureBranch(nn.Module):
+    def __init__(self, feature_dim: int = 32, base_channels: int = 16) -> None:
+        super().__init__()
+        self.feature_dim = max(1, feature_dim)
+        self.extractor = nn.Sequential(
+            nn.Conv2d(1, base_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(base_channels),
+            nn.SiLU(),
+            nn.Conv2d(base_channels, self.feature_dim, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(self.feature_dim),
+            nn.SiLU(),
+            nn.AdaptiveAvgPool2d((1, 1)),
+        )
+        sobel_x = torch.tensor(
+            [[[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]]],
+            dtype=torch.float32,
+        ).unsqueeze(0)
+        sobel_y = torch.tensor(
+            [[[-1.0, -2.0, -1.0], [0.0, 0.0, 0.0], [1.0, 2.0, 1.0]]],
+            dtype=torch.float32,
+        ).unsqueeze(0)
+        self.register_buffer("kernel_x", sobel_x)
+        self.register_buffer("kernel_y", sobel_y)
+
+    def _sobel_map(self, image: torch.Tensor) -> torch.Tensor:
+        image01 = (image + 1.0) * 0.5
+        grad_x = F.conv2d(image01, self.kernel_x, padding=1)
+        grad_y = F.conv2d(image01, self.kernel_y, padding=1)
+        magnitude = torch.sqrt(grad_x.pow(2) + grad_y.pow(2) + 1e-6)
+        max_per_sample = magnitude.amax(dim=(2, 3), keepdim=True).clamp_min(1e-6)
+        return magnitude / max_per_sample
+
+    def forward(self, image: torch.Tensor) -> torch.Tensor:
+        sobel_map = self._sobel_map(image)
+        features = self.extractor(sobel_map)
+        return torch.flatten(features, 1)
+
+
 class EmotionResNet(nn.Module):
     def __init__(
         self,
@@ -234,6 +272,8 @@ class EmotionResNet(nn.Module):
         use_gnn: bool = False,
         gnn_hidden_dim: int = 64,
         gnn_message_steps: int = 2,
+        use_sobel_branch: bool = False,
+        sobel_branch_dim: int = 32,
     ):
         super().__init__()
         self.width_multiplier = max(0.25, width_multiplier)
@@ -282,9 +322,18 @@ class EmotionResNet(nn.Module):
             self.fc_input_dim += self.landmark_branch_dim
         if self.gnn_branch_dim:
             self.fc_input_dim += self.gnn_branch_dim
+        self.sobel_branch: SobelFeatureBranch | None = None
+        self.sobel_branch_dim = 0
+        if use_sobel_branch:
+            self.sobel_branch = SobelFeatureBranch(feature_dim=sobel_branch_dim)
+            self.sobel_branch_dim = self.sobel_branch.feature_dim
+            self.fc_input_dim += self.sobel_branch_dim
         self.fc = nn.Linear(self.fc_input_dim, num_classes)
 
     def forward(self, x: torch.Tensor, landmarks: Optional[torch.Tensor] = None) -> torch.Tensor:
+        sobel_features: torch.Tensor | None = None
+        if self.sobel_branch is not None:
+            sobel_features = self.sobel_branch(x)
         branch_features: torch.Tensor | None = None
         if self.landmark_attention is not None:
             x, branch_features = self.landmark_attention(x, landmarks)
@@ -305,6 +354,8 @@ class EmotionResNet(nn.Module):
         if self.gnn_branch is not None:
             gnn_features = self.gnn_branch(landmarks, x.size(0), device=x.device)
             features = torch.cat([features, gnn_features], dim=1)
+        if sobel_features is not None:
+            features = torch.cat([features, sobel_features], dim=1)
         features = self.dropout(features)
         return self.fc(features)
 
@@ -638,7 +689,7 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
         image, landmarks = self._apply_shared_transforms(image, landmarks)
         if self.filter_transform:
             image = self.filter_transform(image)
-        image = TF.grayscale(image, num_output_channels=1)
+        image = TF.to_grayscale(image, num_output_channels=1)
         image = TF.to_tensor(image)
         if self.augment_erasing:
             image = transforms.RandomErasing(
@@ -996,6 +1047,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-gnn", action="store_true", help="Enable the relational Landmark GNN branch.")
     parser.add_argument("--gnn-hidden-dim", type=int, default=64, help="Hidden dimensionality for the GNN branch output.")
     parser.add_argument("--gnn-steps", type=int, default=2, help="Message passing rounds for the GNN branch.")
+    parser.add_argument("--use-sobel-branch", action="store_true", help="Enable a second feature branch with Sobel gradients.")
+    parser.add_argument("--sobel-branch-dim", type=int, default=32, help="Feature dimensionality produced by the Sobel branch.")
     parser.add_argument(
         "--metadata-file",
         type=Path,
@@ -1087,6 +1140,11 @@ def main() -> None:
         args.gnn_hidden_dim,
         args.gnn_steps,
     )
+    logging.info(
+        "Sobel branch request: %s (dim=%d)",
+        "on" if args.use_sobel_branch else "off",
+        args.sobel_branch_dim,
+    )
 
     device = torch.device(args.device) if args.device else DEFAULT_DEVICE
     torch.manual_seed(RANDOM_SEED)
@@ -1137,6 +1195,8 @@ def main() -> None:
         use_gnn=args.use_gnn,
         gnn_hidden_dim=args.gnn_hidden_dim,
         gnn_message_steps=args.gnn_steps,
+        use_sobel_branch=args.use_sobel_branch,
+        sobel_branch_dim=args.sobel_branch_dim,
     ).to(device)
     log_model_summary(model)
     logging.info("Model architecture:\\n%s", model)
@@ -1150,6 +1210,8 @@ def main() -> None:
             model.gnn_branch.hidden_dim,
             model.gnn_branch.message_steps,
         )
+    if model.sobel_branch is not None:
+        logging.info("Sobel branch: feature_dim=%d", model.sobel_branch.feature_dim)
 
     criterion = build_loss_function(args, class_counts)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
