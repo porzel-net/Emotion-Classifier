@@ -229,6 +229,7 @@ class EmotionResNet(nn.Module):
         layers: Iterable[int],
         num_classes: int,
         width_multiplier: float = 1.0,
+        dropout: float = 0.35,
         landmark_dim: int = 0,
         use_gnn: bool = False,
         gnn_hidden_dim: int = 64,
@@ -254,7 +255,10 @@ class EmotionResNet(nn.Module):
         self.layer4 = self._make_layer(block, scaled_channels[3], layers[3], stride=2)
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.dropout = nn.Dropout(p=0.35)
+        dropout = float(dropout)
+        if not 0.0 <= dropout <= 1.0:
+            raise ValueError(f"dropout must be in [0, 1], got {dropout}")
+        self.dropout = nn.Dropout(p=dropout)
         self.landmark_dim = max(0, landmark_dim)
         self.landmark_attention: LandmarkGuidedAttention | None = None
         self.landmark_branch_dim = 0
@@ -1005,6 +1009,12 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         help="Scale factor (<1 for smaller models, >1 for wider).",
     )
+    parser.add_argument(
+        "--dropout",
+        type=float,
+        default=0.35,
+        help="Dropout probability applied before the classifier head (0.0 to 1.0).",
+    )
     return parser.parse_args()
 
 
@@ -1053,7 +1063,7 @@ def main() -> None:
         augmentation_flags.append(f"noise(std={args.noise_std})")
     aug_text = "none" if not augmentation_flags else ", ".join(augmentation_flags)
     logging.info(
-        "Config: filter=%s, loss=%s, scheduler=%s%s, batch=%d, width=%.2f, val_split=%.2f",
+        "Config: filter=%s, loss=%s, scheduler=%s%s, batch=%d, width=%.2f, dropout=%.2f, val_split=%.2f",
         args.filter,
         args.loss,
         args.scheduler,
@@ -1062,6 +1072,7 @@ def main() -> None:
         else "",
         args.batch_size,
         args.width_multiplier,
+        args.dropout,
         args.val_split,
     )
     logging.info("Augmentations: %s", aug_text)
@@ -1121,6 +1132,7 @@ def main() -> None:
         [2, 2, 2, 2],
         NUM_CLASSES,
         width_multiplier=args.width_multiplier,
+        dropout=args.dropout,
         landmark_dim=landmark_dim if args.use_landmarks else 0,
         use_gnn=args.use_gnn,
         gnn_hidden_dim=args.gnn_hidden_dim,
