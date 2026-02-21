@@ -23,7 +23,7 @@ from torchvision import transforms
 from torchvision.transforms import functional as TF
 from tqdm import tqdm
 
-from neconet_helpers import (
+from helpers.neconet_helpers import (
     CLASS_ORDER,
     EmotionFolderWithPaths,
     apply_laplacian_to_pil,
@@ -45,6 +45,7 @@ DEFAULT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
 DEFAULT_ROOT = Path("data/emotion-classifier-dataset")
 DEFAULT_METADATA = DEFAULT_ROOT / "metadata.csv"
 MODEL_DIR = Path("models")
+BEST_CHECKPOINT = MODEL_DIR / "emotion-classifier-best.pth"
 
 FILTER_TRANSFORMS = {
     "sobel": transforms.Lambda(apply_sobel_to_pil),
@@ -1271,7 +1272,9 @@ def main() -> None:
                 best_val_accuracy = val_acc
                 checkpoint = MODEL_DIR / f"emotion-classifier-step{epoch+1}.pth"
                 torch.save(model.state_dict(), checkpoint)
+                torch.save(model.state_dict(), BEST_CHECKPOINT)
                 logging.info("Saved improved model to %s (val acc %.2f%%)", checkpoint, val_acc)
+                logging.info("Updated best checkpoint at %s", BEST_CHECKPOINT)
 
     logging.info(
         "Final evaluation | Precision=%.4f Recall=%.4f Macro-F1=%.4f",

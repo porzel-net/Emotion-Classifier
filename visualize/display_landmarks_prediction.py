@@ -11,7 +11,7 @@ from matplotlib.lines import Line2D
 import numpy as np
 import tensorflow as tf
 
-from landmark_data import DEFAULT_SIZE, load_landmarks
+from helpers.landmark_data import DEFAULT_SIZE, load_landmarks
 
 
 def parse_args() -> argparse.Namespace:

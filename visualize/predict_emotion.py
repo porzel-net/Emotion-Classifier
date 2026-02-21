@@ -15,7 +15,7 @@ import torch
 import warnings
 from PIL import Image
 
-from neconet_helpers import EMOTION_LABELS, build_model, build_transform, get_device
+from helpers.neconet_helpers import DEFAULT_WEIGHTS, EMOTION_LABELS, build_model, build_transform, get_device
 
 logging.basicConfig(
     level=logging.INFO,
@@ -152,7 +152,7 @@ def parse_args() -> argparse.Namespace:
         "--weights-dir",
         dest="weights",
         type=Path,
-        default=Path("Neconet_Weights3.pth"),
+        default=DEFAULT_WEIGHTS,
         help="Path to .pth checkpoint or weights directory.",
     )
     parser.add_argument("--device", default=None, help="Force torch device such as cpu/mps/cuda.")

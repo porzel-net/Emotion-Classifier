@@ -1,0 +1,47 @@
+Classifcation Metrics: Accuracy, Macro-Precision, Macro-Recall, Macro-averaged F1-score
+Data splitting method: Hold-out
+
+\begin{document} 
+
+{Accuracy}
+Metrics like accuracy are not well-suited for imbalanced datasets because
+-> mainly influenced by the largest class 
+-> correctly identifying minority classes is often more important in this context
+-> not sufficient for evaluating model performance 
+(Carvalho et al., 2025)
+-> Useful as an overview, but it will not be used as a primary metric
+Accuracy score:
+
+
+{Macro-averaged F1-score, Macro-Recall and Macro-Precision}
+Before calculating Macro F1-score, Macro-Precision and Macro-Recall need to be calculated
+-> by averaging precision and recall across all classes 
+-> each class has same importance 
+-> minority classes are just as influential as majority classes
+(Grandini et al., 2020)
+
+
+By using the harmonic mean, 
+-> the F1-score balances precision and recall 
+-> both can contribute equally to the overall value
+-> rewards models that achieve a good compromise between precision and recall rather than 
+excelling in only one of them. 
+(Grandini et al., 2020)
+Macro-F1 score:
+Macro-precison:
+Macro-recall
+
+{Hold-out splitting}
+Dataset is divided into training data and  test data
+-> test set is only used as final evaluation
+-> efficient, classifier is trained only once
+-> fairly simple concept
+Hold-out splitting score:
+
+{Literatur}
+Carvalho, Miguel and Pinho, Armando and Bras, Susana.(2025). Resampling approaches to handle class 
+imbalance: a review from a data perspective. Journal of Big Data. 12.10.1186/s40537-025-01119-4.
+Grandini, Margherita and Bagli, Enrico and Visani, Giorgio. (2020). Metrics for Multi-Class 
+Classification: an Overview. 10.48550/arXiv.2008.05756
+\end{document}
+

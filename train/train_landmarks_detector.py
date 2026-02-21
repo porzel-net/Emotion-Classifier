@@ -10,7 +10,7 @@ import tensorflow as tf
 
 from tensorflow.keras.preprocessing.image import apply_affine_transform
 
-from landmark_data import DEFAULT_SIZE, load_landmarks
+from helpers.landmark_data import DEFAULT_SIZE, load_landmarks
 
 
 class LearningRatePrinter(tf.keras.callbacks.Callback):

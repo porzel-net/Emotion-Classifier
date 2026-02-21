@@ -18,7 +18,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from Model_architecture_Code import Block, ResNet
+from .model_architecture import Block, ResNet
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ NECONET_PLAN = [2, 2, 2, 2]
 IMAGE_SIZE = 64
 NORMALIZE_MEAN = (0.5,)
 NORMALIZE_STD = (0.5,)
-DEFAULT_WEIGHTS = Path("Neconet_Weights3")
+DEFAULT_WEIGHTS = Path("models/Neconet_Weights3.pth")
 DEFAULT_DATASET_ROOT = Path("data/emotion-classifier-dataset")
 
 Record = Tuple[str, int, int, float]

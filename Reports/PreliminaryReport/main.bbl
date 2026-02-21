@@ -1,0 +1,148 @@
+\begin{thebibliography}{21}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Alok(2025)]{rafdb_kaggle2025}
+Shuvo Alok.
+\newblock Raf-db dataset, 2025.
+\newblock Kaggle dataset. Accessed December 18, 2025.
+
+\bibitem[Chen et~al.(2019)Chen, Xie, Huang, Rong, Ding, Huang, Xu, and
+  Huang]{chen2019progressive}
+Chaoqi Chen, Weiping Xie, Wenbing Huang, Yu Rong, Xinghao Ding, Yue Huang,
+  Tingyang Xu, and Junzhou Huang.
+\newblock Progressive feature alignment for unsupervised domain adaptation.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 627--636, 2019.
+
+\bibitem[Deng et~al.(2020)Deng, Guo, Ververas, Kotsia, and
+  Zafeiriou]{deng2020retinaface}
+Jiankang Deng, Jia Guo, Evangelos Ververas, Irene Kotsia, and Stefanos
+  Zafeiriou.
+\newblock Retinaface: Single-shot multi-level face localisation in the wild.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 5203--5212, 2020.
+
+\bibitem[Deng et~al.(2022)Deng, Li, Song, and Xiang]{deng2022bort2}
+Zhongying Deng, Da Li, Yi-Zhe Song, and Tao Xiang.
+\newblock Robust target training for multi-source domain adaptation.
+\newblock \emph{arXiv preprint arXiv:2210.01676}, 2022.
+
+\bibitem[Fatihkgg(2025)]{affectnet8_kaggle2025}
+Fatihkgg.
+\newblock Affectnet-8 dataset (yolo format), 2025.
+\newblock Kaggle dataset. Accessed December 18, 2025.
+
+\bibitem[Fernando and Tsokos(2021)]{fernando2021dwb}
+K.~Ruwani~M. Fernando and Chris~P. Tsokos.
+\newblock Dynamically weighted balanced loss: Class imbalanced learning and
+  confidence calibration of deep neural networks.
+\newblock \emph{IEEE Transactions on Neural Networks and Learning Systems},
+  33\penalty0 (7):\penalty0 2940--2951, 2021.
+
+\bibitem[Gunturk et~al.(2003)Gunturk, Batur, Altunbasak, III, and
+  Mersereau]{gunturk2003eigenface}
+Bahadir~K. Gunturk, Aziz~U. Batur, Yucel Altunbasak, Monson H.~Hayes III, and
+  Russell~M. Mersereau.
+\newblock Eigenface-domain super-resolution for face recognition.
+\newblock \emph{IEEE Transactions on Image Processing}, 12\penalty0
+  (5):\penalty0 597--600, 2003.
+
+\bibitem[Kingma and Ba(2015)]{kingma2014adam}
+Diederik~P. Kingma and Jimmy Ba.
+\newblock Adam: A method for stochastic optimization.
+\newblock In \emph{International Conference on Learning Representations}, 2015.
+
+\bibitem[Loshchilov and Hutter(2017)]{loshchilov2017decoupled}
+Ilya Loshchilov and Frank Hutter.
+\newblock Decoupled weight decay regularization.
+\newblock \emph{arXiv preprint arXiv:1711.05101}, 2017.
+\newblock Published as a conference paper at ICLR 2019.
+
+\bibitem[Mazen et~al.(2021)Mazen, Nashat, and Seoud]{mazen2021balanced}
+Fatma Mazen, Ahmed Nashat, and Rania Ahmed~Abul Seoud.
+\newblock Real time face expression recognition along with balanced fer2013
+  dataset using cyclegan.
+\newblock \emph{International Journal of Advanced Computer Science and
+  Applications (IJACSA)}, 12\penalty0 (6):\penalty0 153--158, 2021.
+
+\bibitem[Modi(2021)]{modi2021resnet}
+Rohit Modi.
+\newblock Resnet — understand and implement from scratch.
+\newblock \emph{Medium}, 2021.
+\newblock Reference from the Model Architecture research draft.
+
+\bibitem[Msambare(2025)]{fer2013_kaggle2025}
+Msambare.
+\newblock Fer-2013 dataset, 2025.
+\newblock Kaggle dataset. Accessed December 18, 2025.
+
+\bibitem[Nair and Hinton(2010)]{nair2010rectified}
+Vinod Nair and Geoffrey~E. Hinton.
+\newblock Rectified linear units improve restricted boltzmann machines.
+\newblock In \emph{Proceedings of the 27th International Conference on Machine
+  Learning}, pages 807--814, 2010.
+
+\bibitem[Pandeya et~al.(2025)Pandeya, Mittal, Bansal, and
+  Srivastava]{pandeya2025resnet}
+Gaurav~Kumar Pandeya, Khushi Mittal, Antra Bansal, and Sumit Srivastava.
+\newblock Fire detection with resnet 18: Comparative analysis across different
+  hyperparameters.
+\newblock \emph{ScienceDirect}, 2025.
+\newblock Reference from the Model Architecture research draft.
+
+\bibitem[Reginato(2024)]{reginato2024practical}
+Leonardo Reginato.
+\newblock A practical comparison between cnn and resnet architectures: A focus
+  on attention mechanisms.
+\newblock \emph{Medium}, 2024.
+\newblock Reference from the Model Architecture research draft.
+
+\bibitem[Selvaraju et~al.(2017)Selvaraju, Cogswell, Das, Vedantam, Parikh, and
+  Batra]{selvaraju2017gradcam}
+Ramprasaath~R. Selvaraju, Michael Cogswell, Abhishek Das, Ramakrishna Vedantam,
+  Devi Parikh, and Dhruv Batra.
+\newblock Grad-cam: Visual explanations from deep networks via gradient-based
+  localization.
+\newblock In \emph{Proceedings of the IEEE International Conference on Computer
+  Vision}, pages 618--626, 2017.
+
+\bibitem[Shocher et~al.(2018)Shocher, Cohen, and Irani]{shocher2018zssr}
+Assaf Shocher, Nadav Cohen, and Michal Irani.
+\newblock “zero-shot” super-resolution using deep internal learning.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition}, pages 3118--3126, 2018.
+
+\bibitem[Srivastava et~al.(2014)Srivastava, Hinton, Krizhevsky, Sutskever, and
+  Salakhutdinov]{srivastava2014dropout}
+Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky, Ilya Sutskever, and Ruslan
+  Salakhutdinov.
+\newblock Dropout: A simple way to prevent neural networks from overfitting.
+\newblock \emph{Journal of Machine Learning Research}, 15\penalty0
+  (56):\penalty0 1929--1958, 2014.
+
+\bibitem[Talele and Jain(2024)]{talele2024cnnresnet}
+Milind Talele and Rajashree Jain.
+\newblock A comparative analysis of cnns and resnet50 for facial emotion
+  recognition.
+\newblock \emph{Engineering, Technology \& Applied Science Research},
+  15\penalty0 (2), 2024.
+
+\bibitem[Yalçın and Alisawi(2024)]{yalcin2024novel}
+Nursel Yalçın and Muthana Alisawi.
+\newblock Introducing a novel dataset for facial emotion recognition and
+  demonstrating significant enhancements in deep learning performance through
+  pre-processing techniques.
+\newblock \emph{Heliyon}, 10\penalty0 (20):\penalty0 e38913, 2024.
+
+\bibitem[Zhang(2024)]{zhang2024alexnetresnet}
+Wenxuan Zhang.
+\newblock Comparison of alexnet and resnet models for remote sensing image
+  recognition.
+\newblock \emph{Transactions on Computer Science and Intelligent Systems
+  Research}, 5, 2024.
+
+\end{thebibliography}

@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
-from neconet_helpers import (
+from helpers.neconet_helpers import (
     CLASS_ORDER,
     EmotionFolderWithPaths,
     apply_laplacian_to_pil,
@@ -475,7 +475,7 @@ def parse_args() -> argparse.Namespace:
         "--metadata-file",
         type=Path,
         default=DEFAULT_METADATA,
-        help="CSV containing normalized landmarks (same format as prepare_emotion_classifier_dataset.py).",
+        help="CSV containing normalized landmarks (same format as prepare_data/prepare-fer2013.py).",
     )
     parser.add_argument(
         "--landmark-weight",

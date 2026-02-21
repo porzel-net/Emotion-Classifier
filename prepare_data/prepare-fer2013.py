@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 import face_alignment
 import numpy as np
-from neconet_helpers import apply_sobel
+from helpers.neconet_helpers import apply_sobel
 
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -160,7 +160,7 @@ def parse_args():
     parser.add_argument(
         "--source",
         type=Path,
-        default=Path("data/emotion-detection-fer"),
+        default=Path("data/fer2013"),
         help="Source FER dataset root (must contain train/ and test/)",
     )
     parser.add_argument(
