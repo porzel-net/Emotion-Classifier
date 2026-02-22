@@ -252,13 +252,14 @@ Purpose:
 - trains the lightweight Neconet-style emotion classifier,
 - supports multiple preprocessing filters and augmentation switches,
 - supports optional landmark, GNN, and Sobel side branches,
+- can concatenate multiple prepared datasets for joint training/testing (e.g. FER2013 + AffectNet),
 - writes best checkpoint to `models/emotion-classifier-best.pth`.
 
 Example:
 
 ```bash
 python -m train.train_emotion_classifier \
-  --data-root data/fer2013-prepared \
+  --datasets fer2013 affectnet \
   --epochs 40 \
   --batch-size 128 \
   --filter sobel \
@@ -270,11 +271,18 @@ python -m train.train_emotion_classifier \
   --device mps
 ```
 
+Notes:
+- When using `--datasets fer2013 affectnet`, both `train/` and `test/` splits are concatenated across the two prepared roots.
+- FER2013 prepared images (`48x48`) are automatically upscaled to `64x64` by the training transform pipeline.
+- Landmark metadata is loaded automatically from `metadata.csv` in each dataset root (and from `<val-data-root>/metadata.csv` for external validation).
+
 ### Parameters
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `--data-root` | No | `data/fer2013-prepared` | Training dataset root. |
+| `--datasets` | No | disabled | Preset dataset roots to concatenate. Choices: `fer2013`, `affectnet`. Example: `--datasets fer2013 affectnet`. |
+| `--data-root` | No | `data/fer2013-prepared` | Primary dataset root (used when `--datasets` is not set). |
+| `--extra-data-roots` | No | none | Additional dataset roots concatenated with `--data-root` (ignored when `--datasets` is set). |
 | `--val-data-root` | No | disabled | Optional separate dataset root used only for validation. |
 | `--val-data-split` | No | `test` | Split name inside `--val-data-root` for validation. |
 | `--epochs` | No | `40` | Number of training epochs. |
@@ -302,8 +310,6 @@ python -m train.train_emotion_classifier \
 | `--gnn-steps` | No | `2` | Message-passing steps for GNN branch. |
 | `--use-sobel-branch` | No | `False` | Enable extra Sobel feature branch. |
 | `--sobel-branch-dim` | No | `32` | Feature size for Sobel branch. |
-| `--metadata-file` | No | `data/fer2013-prepared/metadata.csv` | Landmark metadata CSV for training root. |
-| `--val-metadata-file` | No | auto | Landmark metadata CSV for validation root (defaults to `<val-data-root>/metadata.csv`). |
 | `--device` | No | auto | Torch device override (`cpu`, `mps`, `cuda`). |
 | `--width-multiplier` | No | `1.0` | Width scaling for model channels. |
 | `--dropout` | No | `0.35` | Dropout before classifier head. |

@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
 from torch.optim import Adam
-from torch.utils.data import DataLoader, Subset, random_split
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset, random_split
 from torchvision import transforms
 from torchvision.transforms import functional as TF
 from tqdm import tqdm
@@ -43,9 +43,12 @@ IMAGE_SIZE = 64
 NUM_CLASSES = len(CLASS_ORDER)
 DEFAULT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
 DEFAULT_ROOT = Path("data/fer2013-prepared")
-DEFAULT_METADATA = DEFAULT_ROOT / "metadata.csv"
 MODEL_DIR = Path("models")
 BEST_CHECKPOINT = MODEL_DIR / "emotion-classifier-best.pth"
+DATASET_PRESETS = {
+    "fer2013": Path("data/fer2013-prepared"),
+    "affectnet": Path("data/affectnet-yolo-format-prepared"),
+}
 
 FILTER_TRANSFORMS = {
     "sobel": transforms.Lambda(apply_sobel_to_pil),
@@ -707,28 +710,66 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
         return image, label, landmarks
 
 
-def _count_targets(dataset: EmotionFolderWithPaths | Subset) -> Counter[int]:
+def resolve_training_roots(args: argparse.Namespace) -> list[Path]:
+    if args.datasets:
+        roots = [DATASET_PRESETS[name] for name in args.datasets]
+    else:
+        roots = [args.data_root, *args.extra_data_roots]
+
+    unique_roots: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_roots.append(root)
+    return unique_roots
+
+
+def _dataset_targets(dataset: Dataset | Subset) -> list[int]:
     if isinstance(dataset, Subset):
-        return Counter(dataset.dataset.targets[idx] for idx in dataset.indices)
-    return Counter(dataset.targets)
+        base_targets = _dataset_targets(dataset.dataset)
+        return [base_targets[idx] for idx in dataset.indices]
+    if isinstance(dataset, ConcatDataset):
+        all_targets: list[int] = []
+        for child in dataset.datasets:
+            all_targets.extend(_dataset_targets(child))
+        return all_targets
+
+    targets = getattr(dataset, "targets", None)
+    if targets is None:
+        raise AttributeError("Dataset does not expose targets for class balancing/counting.")
+    return [int(label) for label in targets]
 
 
-def _balanced_indices(dataset: EmotionFolderWithPaths) -> list[int]:
+def _count_targets(dataset: Dataset | Subset) -> Counter[int]:
+    return Counter(_dataset_targets(dataset))
+
+
+def _balanced_indices(dataset: Dataset) -> list[int]:
+    targets = _dataset_targets(dataset)
     buckets: dict[int, list[int]] = defaultdict(list)
-    for idx, (_, label) in enumerate(dataset.samples):
-        buckets[label].append(idx)
+    for idx, label in enumerate(targets):
+        if 0 <= label < NUM_CLASSES:
+            buckets[label].append(idx)
+    if not buckets:
+        return []
+
     min_count = min(len(bucket) for bucket in buckets.values())
     rng = random.Random(RANDOM_SEED)
     selected: list[int] = []
     for label in range(NUM_CLASSES):
-        choices = buckets[label]
+        choices = buckets.get(label, [])
+        if not choices:
+            continue
         rng.shuffle(choices)
         selected.extend(choices[:min_count])
     rng.shuffle(selected)
     return selected
 
 
-def _split_dataset(dataset: EmotionFolderWithPaths | Subset, split: float) -> tuple[EmotionFolderWithPaths | Subset, Optional[Subset]]:
+def _split_dataset(dataset: Dataset, split: float) -> tuple[Dataset, Optional[Subset]]:
     if split <= 0.0:
         return dataset, None
     split = min(max(split, 0.01), 0.5)
@@ -741,10 +782,55 @@ def _split_dataset(dataset: EmotionFolderWithPaths | Subset, split: float) -> tu
     return train_subset, val_subset
 
 
+def _build_split_dataset(
+    root: Path,
+    split: str,
+    transform: Optional[transforms.Compose],
+    use_landmarks: bool,
+    metadata_map: dict[str, np.ndarray],
+    landmark_dim: int,
+    args: argparse.Namespace,
+    *,
+    train_mode: bool,
+) -> Dataset:
+    split_root = root / split
+    if not split_root.exists():
+        raise FileNotFoundError(f"Dataset split folder not found: {split_root}")
+
+    if use_landmarks:
+        dataset: Dataset = LandmarkAwareEmotionFolder(
+            root=split_root,
+            transform=None,
+            metadata_map=metadata_map,
+            metadata_root=root,
+            landmark_dim=landmark_dim,
+            filter_name=args.filter,
+            augment_rotation=args.augment_rotation if train_mode else False,
+            augment_scale=args.augment_scale if train_mode else False,
+            augment_translation=args.augment_translation if train_mode else False,
+            augment_perspective=args.augment_perspective if train_mode else False,
+            augment_erasing=args.augment_erasing if train_mode else False,
+            augment_noise=args.augment_noise if train_mode else False,
+            noise_std=args.noise_std,
+            train_mode=train_mode,
+        )
+    else:
+        if transform is None:
+            raise ValueError("transform must not be None when landmarks are disabled.")
+        dataset = EmotionFolderWithPaths(root=split_root, transform=transform)
+
+    filter_classes(dataset)
+    return dataset
+
+
 def build_dataloaders(
     args: argparse.Namespace,
     device: torch.device,
 ) -> tuple[DataLoader, Optional[DataLoader], DataLoader, Counter[int], int]:
+    training_roots = resolve_training_roots(args)
+    if not training_roots:
+        raise ValueError("No training dataset roots configured.")
+
     train_transform, eval_transform = build_transforms(
         args.filter,
         args.augment_rotation,
@@ -756,35 +842,54 @@ def build_dataloaders(
         args.noise_std,
     )
 
-    metadata_map: dict[str, np.ndarray] = {}
+    metadata_maps: dict[Path, dict[str, np.ndarray]] = {}
+    metadata_dims: dict[Path, int] = {}
     landmark_dim = 0
     if args.use_landmarks:
-        metadata_map, landmark_dim = load_landmark_metadata(args.metadata_file, args.data_root)
+        for root in training_roots:
+            metadata_file = root / "metadata.csv"
+            metadata_map, root_landmark_dim = load_landmark_metadata(metadata_file, root)
+            metadata_maps[root] = metadata_map
+            metadata_dims[root] = root_landmark_dim
+            if landmark_dim == 0 and root_landmark_dim > 0:
+                landmark_dim = root_landmark_dim
+
+        for root, root_landmark_dim in metadata_dims.items():
+            if root_landmark_dim and landmark_dim and root_landmark_dim != landmark_dim:
+                logging.warning(
+                    "Landmark dimension for %s is %d (expected %d). Mismatched entries are zero-filled.",
+                    root,
+                    root_landmark_dim,
+                    landmark_dim,
+                )
     use_landmarks = args.use_landmarks and landmark_dim > 0
 
-    if use_landmarks:
-        train_dataset = LandmarkAwareEmotionFolder(
-            root=args.data_root / "train",
-            transform=None,
-            metadata_map=metadata_map,
-            metadata_root=args.data_root,
-            landmark_dim=landmark_dim,
-            filter_name=args.filter,
-            augment_rotation=args.augment_rotation,
-            augment_scale=args.augment_scale,
-            augment_translation=args.augment_translation,
-            augment_perspective=args.augment_perspective,
-            augment_erasing=args.augment_erasing,
-            augment_noise=args.augment_noise,
-            noise_std=args.noise_std,
-            train_mode=True,
+    train_datasets: list[Dataset] = []
+    for root in training_roots:
+        train_datasets.append(
+            _build_split_dataset(
+                root=root,
+                split="train",
+                transform=train_transform,
+                use_landmarks=use_landmarks,
+                metadata_map=metadata_maps.get(root, {}),
+                landmark_dim=landmark_dim,
+                args=args,
+                train_mode=True,
+            )
         )
+
+    train_dataset: Dataset
+    if len(train_datasets) == 1:
+        train_dataset = train_datasets[0]
     else:
-        train_dataset = EmotionFolderWithPaths(root=args.data_root / "train", transform=train_transform)
-    filter_classes(train_dataset)
+        train_dataset = ConcatDataset(train_datasets)
 
     if args.sampling == "undersample":
-        sampled = Subset(train_dataset, _balanced_indices(train_dataset))
+        balanced_indices = _balanced_indices(train_dataset)
+        if not balanced_indices:
+            raise ValueError("Unable to create undersampled subset: no class targets found.")
+        sampled: Dataset | Subset = Subset(train_dataset, balanced_indices)
     else:
         sampled = train_dataset
 
@@ -832,9 +937,7 @@ def build_dataloaders(
         )
 
         if use_landmarks:
-            val_metadata_file = args.val_metadata_file
-            if val_metadata_file is None:
-                val_metadata_file = val_root / "metadata.csv"
+            val_metadata_file = val_root / "metadata.csv"
             val_metadata_map: dict[str, np.ndarray] = {}
             if val_metadata_file.exists():
                 val_metadata_map, val_landmark_dim = load_landmark_metadata(
@@ -884,26 +987,25 @@ def build_dataloaders(
             pin_memory=pin_memory,
         )
 
-    if use_landmarks:
-        test_dataset = LandmarkAwareEmotionFolder(
-            root=args.data_root / "test",
-            transform=None,
-            metadata_map=metadata_map,
-            metadata_root=args.data_root,
-            landmark_dim=landmark_dim,
-            filter_name=args.filter,
-            augment_rotation=False,
-            augment_scale=False,
-            augment_translation=False,
-            augment_perspective=False,
-            augment_erasing=False,
-            augment_noise=False,
-            noise_std=args.noise_std,
-            train_mode=False,
+    test_datasets: list[Dataset] = []
+    for root in training_roots:
+        test_datasets.append(
+            _build_split_dataset(
+                root=root,
+                split="test",
+                transform=eval_transform,
+                use_landmarks=use_landmarks,
+                metadata_map=metadata_maps.get(root, {}),
+                landmark_dim=landmark_dim,
+                args=args,
+                train_mode=False,
+            )
         )
+
+    if len(test_datasets) == 1:
+        test_dataset = test_datasets[0]
     else:
-        test_dataset = EmotionFolderWithPaths(root=args.data_root / "test", transform=eval_transform)
-    filter_classes(test_dataset)
+        test_dataset = ConcatDataset(test_datasets)
     test_loader = DataLoader(
         dataset=test_dataset,
         batch_size=args.batch_size,
@@ -1078,7 +1180,21 @@ def log_model_summary(model: nn.Module) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train and evaluate the lightweight Neconet ResNet variants.")
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        choices=sorted(DATASET_PRESETS.keys()),
+        default=None,
+        help="Optional dataset presets to concatenate (e.g. --datasets fer2013 affectnet).",
+    )
     parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="Path to prepared emotion dataset root")
+    parser.add_argument(
+        "--extra-data-roots",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="Optional extra dataset roots to concatenate with --data-root (ignored when --datasets is used).",
+    )
     parser.add_argument(
         "--val-data-root",
         type=Path,
@@ -1134,18 +1250,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gnn-steps", type=int, default=2, help="Message passing rounds for the GNN branch.")
     parser.add_argument("--use-sobel-branch", action="store_true", help="Enable a second feature branch with Sobel gradients.")
     parser.add_argument("--sobel-branch-dim", type=int, default=32, help="Feature dimensionality produced by the Sobel branch.")
-    parser.add_argument(
-        "--metadata-file",
-        type=Path,
-        default=DEFAULT_METADATA,
-        help="CSV containing landmark annotations.",
-    )
-    parser.add_argument(
-        "--val-metadata-file",
-        type=Path,
-        default=None,
-        help="Optional CSV with landmark annotations for --val-data-root (default: <val-data-root>/metadata.csv).",
-    )
     parser.add_argument("--device", type=str, default=None, help="Override training device (cuda/cpu/mps).")
     parser.add_argument(
         "--width-multiplier",
@@ -1191,6 +1295,7 @@ def _loader_summary(name: str, loader: DataLoader) -> None:
 def main() -> None:
     args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    training_roots = resolve_training_roots(args)
 
     augmentation_flags = []
     if args.augment_rotation:
@@ -1223,7 +1328,7 @@ def main() -> None:
     logging.info(
         "Landmarks: %s metadata=%s",
         "enabled" if args.use_landmarks else "disabled",
-        args.metadata_file,
+        "<dataset-root>/metadata.csv",
     )
     logging.info(
         "GNN branch request: %s (hidden=%d steps=%d)",
@@ -1242,14 +1347,17 @@ def main() -> None:
     if device.type == "cuda":
         torch.cuda.manual_seed_all(RANDOM_SEED)
 
+    roots_text = ", ".join(str(root) for root in training_roots)
     logging.info(
         "Loading data from %s (filter=%s, sampling=%s, width=%.2f, landmarks=%s)",
-        args.data_root,
+        roots_text,
         args.filter,
         args.sampling,
         args.width_multiplier,
         args.use_landmarks,
     )
+    if len(training_roots) > 1 and any("fer2013" in root.as_posix().lower() for root in training_roots):
+        logging.info("FER2013 inputs (48x48) are upscaled to 64x64 in the preprocessing pipeline.")
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     train_loader, val_loader, test_loader, class_counts, landmark_dim = build_dataloaders(args, device)
     gnn_requested = args.use_gnn
