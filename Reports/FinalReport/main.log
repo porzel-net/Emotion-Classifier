@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14)  22 FEB 2026 22:55
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14)  22 FEB 2026 23:08
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -631,34 +631,35 @@ Package pdftex.def Info: media/Architecture-Structure.jpeg  used on input line
 (pdftex.def)             Requested size: 237.13594pt x 214.14516pt.
  [2 <./media/Architecture-Structure.jpeg>])
 (./sec/experiments.tex
-<media/Landmark-Detecter-Results.jpeg, id=95, 1606.0pt x 1148.29pt>
+<media/Landmark-Detecter-Results.jpeg, id=97, 1606.0pt x 1148.29pt>
 File: media/Landmark-Detecter-Results.jpeg Graphic file (type jpg)
 <use media/Landmark-Detecter-Results.jpeg>
 Package pdftex.def Info: media/Landmark-Detecter-Results.jpeg  used on input li
 ne 26.
 (pdftex.def)             Requested size: 237.13594pt x 169.53775pt.
-<media/Model-Performance-Comparison.jpeg, id=96, 1606.0pt x 949.5475pt>
+ [3]
+<media/Model-Performance-Comparison.jpeg, id=103, 1606.0pt x 949.5475pt>
 File: media/Model-Performance-Comparison.jpeg Graphic file (type jpg)
 <use media/Model-Performance-Comparison.jpeg>
 Package pdftex.def Info: media/Model-Performance-Comparison.jpeg  used on input
  line 33.
 (pdftex.def)             Requested size: 237.13594pt x 140.19469pt.
-) (./sec/results.tex [3 <./media/Landmark-Detecter-Results.jpeg>]
-<media/Effect of Dropout on Generalization.jpeg, id=103, 1606.0pt x 974.64125pt
+) (./sec/results.tex
+<media/Effect of Dropout on Generalization.jpeg, id=104, 1606.0pt x 974.64125pt
 >
 File: media/Effect of Dropout on Generalization.jpeg Graphic file (type jpg)
 <use media/Effect of Dropout on Generalization.jpeg>
 Package pdftex.def Info: media/Effect of Dropout on Generalization.jpeg  used o
 n input line 10.
 (pdftex.def)             Requested size: 237.13594pt x 143.89961pt.
-<media/Weight-Decay-Regularization-Effect.jpeg, id=104, 1606.0pt x 978.65625pt>
+<media/Weight-Decay-Regularization-Effect.jpeg, id=105, 1606.0pt x 978.65625pt>
 
 File: media/Weight-Decay-Regularization-Effect.jpeg Graphic file (type jpg)
 <use media/Weight-Decay-Regularization-Effect.jpeg>
 Package pdftex.def Info: media/Weight-Decay-Regularization-Effect.jpeg  used on
  input line 19.
 (pdftex.def)             Requested size: 237.13594pt x 144.4924pt.
-<media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg, id=105, 16
+<media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg, id=106, 16
 06.0pt x 965.6075pt>
 File: media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg Graphi
 c file (type jpg)
@@ -666,7 +667,8 @@ c file (type jpg)
 Package pdftex.def Info: media/Performance-After-Custom-Transformation-(Optimal
  Setup).jpeg  used on input line 30.
 (pdftex.def)             Requested size: 237.13594pt x 142.56584pt.
-) (./sec/discussion_conclusion_outlook.tex
+)
+(./sec/discussion_conclusion_outlook.tex
 Missing character: There is no f in font nullfont!
 Missing character: There is no a in font nullfont!
 Missing character: There is no c in font nullfont!
@@ -680,15 +682,14 @@ Missing character: There is no m in font nullfont!
 Missing character: There is no e in font nullfont!
 Missing character: There is no n in font nullfont!
 Missing character: There is no t in font nullfont!
-) (./main.bbl (./main.brf)
+[4 <./media/Landmark-Detecter-Results.jpeg> <./media/Model-Performance-Comparis
+on.jpeg> <./media/Effect of Dropout on Generalization.jpeg> <./media/Weight-Dec
+ay-Regularization-Effect.jpeg>]) (./main.bbl (./main.brf)
 \tf@brf=\write4
 \openout4 = `main.brf'.
 
- [4 <./media/Effect of Dropout on Generalization.jpeg> <./media/Model-Performan
-ce-Comparison.jpeg> <./media/Weight-Decay-Regularization-Effect.jpeg> <./media/
-Performance-After-Custom-Transformation-(Optimal Setup).jpeg>]) [5
-
-] (./main.aux)
+) [5 <./media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg>] (.
+/main.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-11-14>
@@ -699,13 +700,13 @@ Package rerunfilecheck Info: File `main.brf' has not changed.
 (rerunfilecheck)             Checksum: 5742B1ED9D1CCE67A226CCFE111E0757;44.
  ) 
 Here is how much of TeX's memory you used:
- 15393 strings out of 469010
- 255902 string characters out of 5454854
+ 15397 strings out of 469010
+ 255940 string characters out of 5454854
  718752 words of memory out of 5000000
- 43825 multiletter control sequences out of 15000+600000
- 650872 words of font info for 91 fonts, out of 8000000 for 9000
+ 43827 multiletter control sequences out of 15000+600000
+ 654042 words of font info for 95 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 90i,9n,93p,885b,527s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 90i,9n,93p,885b,461s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmex1
 0.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/cm/c
 mmi10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/
@@ -719,13 +720,14 @@ ublic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/
 type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025basic/texmf-dist/fon
 ts/type1/public/amsfonts/cm/cmsy9.pfb></usr/local/texlive/2025basic/texmf-dist/
-fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2025basic/texmf-dist/fonts
-/type1/urw/times/utmr8a.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type
-1/urw/times/utmri8a.pfb>
-Output written on main.pdf (5 pages, 1210627 bytes).
+fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2025basic/te
+xmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2025basic/texmf-d
+ist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2025basic/texmf-dist/f
+onts/type1/urw/times/utmri8a.pfb>
+Output written on main.pdf (5 pages, 1226031 bytes).
 PDF statistics:
- 198 PDF objects out of 1000 (max. 8388607)
- 153 compressed objects within 2 object streams
+ 203 PDF objects out of 1000 (max. 8388607)
+ 156 compressed objects within 2 object streams
  34 named destinations out of 1000 (max. 500000)
  159 words of extra memory for PDF output out of 10000 (max. 10000000)
 

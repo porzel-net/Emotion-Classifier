@@ -18,51 +18,57 @@ In addition, after the blocks we use a Global Average Pooling (GAP) instead of t
 
 \textbf{Raw landmark fusion.}
 Motivation: inject explicit facial geometry with minimal parameter overhead.
-Technical description: the landmark tensor is flattened to a fixed $2N$ vector and passed directly to late fusion without extra nonlinear layers.
-This preserves exact coordinate information and avoids early compression artifacts.
-Integration: this branch is attached directly before the classifier head.
+Technical description: for a batch size \(B\), landmarks are represented as \(L\in\mathbb{R}^{B\times 2N}\) and concatenated directly with pooled backbone features \(z_{\text{cnn}}\in\mathbb{R}^{B\times C}\), where \(C\) is the width-multiplied final channel dimension.
+No intermediate MLP is applied to \(L\), so coordinate precision is preserved and branch latency remains negligible.
+Integration: late fusion at head input, \(z=[z_{\text{cnn}};L]\).
 
 \textbf{Multi-view heatmap branch.}
 Motivation: represent landmark information at multiple spatial scales.
-Technical description: landmarks are projected into Gaussian heatmaps with multiple $\sigma$ values:
+Technical description: landmarks are reshaped to point sets \((x_i,y_i)\), clamped to the valid image grid, and rasterized into Gaussian maps for \(\sigma\in\{1,2,4\}\):
 \[
 H_k(x,y)=\sum_{i=1}^{N}\exp\left(-\frac{(x-x_i)^2+(y-y_i)^2}{2\sigma_k^2+\epsilon}\right).
 \]
-Coordinates are clamped to the valid image grid before rasterization, then stacked maps are processed by a compact CNN
-(Conv-BN-SiLU blocks with global pooling) into a dense embedding.
-Integration: the pooled heatmap feature is appended to the head input.
+The stacked tensor \(H\in\mathbb{R}^{B\times 3\times 64\times 64}\) is processed by a compact Conv-BN-SiLU encoder and global average pooling to produce a dense branch embedding \(z_{\text{hm}}\in\mathbb{R}^{B\times d_{\text{hm}}}\).
+Integration: \(z_{\text{hm}}\) is concatenated into the classifier head vector.
 
 \textbf{Landmark-guided attention.}
 Motivation: amplify expression-relevant regions before deep feature extraction.
-Technical description: image and heatmaps are fused to predict an attention mask $A(x,y)$ and apply
+Technical description: image and heatmaps are channel-wise concatenated, \(F=[I;H]\in\mathbb{R}^{B\times (1+3)\times 64\times 64}\), then passed through a Conv-BN-SiLU-Conv-Sigmoid attention block to estimate \(A\in\mathbb{R}^{B\times 1\times 64\times 64}\).
+Input modulation is performed as
 \[
 \tilde{I}(x,y)=I(x,y)\cdot(1+A(x,y)).
 \]
-The mask is produced by a small Conv-BN-SiLU stack followed by Sigmoid, so modulation remains bounded and stable.
-Integration: this modulation is applied in the main image path before deeper backbone stages, and an optional pooled feature from the fused tensor is also exposed to the classifier head.
+In parallel, an auxiliary feature path applies Conv-BN-SiLU-\(1\times1\) Conv and adaptive pooling on \(F\), yielding \(z_{\text{att}}\in\mathbb{R}^{B\times d_{\text{att}}}\) (\(d_{\text{att}}=32\) in the current setup).
+Integration: \(\tilde{I}\) replaces the original image in the backbone stream; \(z_{\text{att}}\) is appended at head fusion.
 
 \textbf{Sobel feature branch.}
 Motivation: preserve high-frequency edge structure as a complementary cue.
-Technical description: fixed Sobel kernels compute $G_x$ and $G_y$, then gradient magnitude is formed as
+Technical description: normalized grayscale input \(I\in[-1,1]\) is remapped to \([0,1]\), convolved with fixed Sobel kernels to obtain \(G_x,G_y\), and converted to gradient magnitude
 \[
 M=\sqrt{G_x^2+G_y^2+\epsilon}.
 \]
-Inputs are first remapped from normalized range to $[0,1]$, and $M$ is normalized per sample by its spatial maximum.
-The resulting edge map is encoded by a dedicated compact convolutional branch (Conv-BN-SiLU, global pooling).
-Integration: the resulting Sobel embedding is concatenated in the same head-level fusion vector.
+\(M\) is then normalized per sample by \(\max_{x,y} M(x,y)\) for contrast-invariant scaling and encoded by a dedicated Conv-BN-SiLU branch with global pooling, producing \(z_{\text{sobel}}\in\mathbb{R}^{B\times d_{\text{sobel}}}\).
+Integration: \(z_{\text{sobel}}\) is fused by concatenation at the classifier head.
 
 \textbf{Landmark GNN branch.}
 Motivation: capture relational geometry between landmarks, not only absolute coordinates.
-Technical description: landmarks are treated as graph nodes with 2D coordinates, linearly projected to hidden embeddings, and updated for multiple message-passing rounds.
-Each round applies a shared message MLP, mean-aggregates node context, concatenates local and global context, and updates node states with a nonlinear projection.
-Final graph features are obtained through global pooling over nodes.
-Integration: the pooled graph embedding is injected into the classifier head with other branch features.
+Technical description: landmarks are interpreted as \(N\) nodes with 2D features, \(V\in\mathbb{R}^{B\times N\times 2}\). Node states are initialized by linear projection \(h_i^{(0)}=W_p v_i\).
+For each message-passing step \(t\): \(m_i^{(t)}=\phi(W_m h_i^{(t)})\), global context \(g^{(t)}=\frac{1}{N}\sum_i m_i^{(t)}\), update \(h_i^{(t+1)}=\phi\!\left(W_u[h_i^{(t)};g^{(t)}]\right)\), with \(\phi=\mathrm{SiLU}\).
+After \(T\) steps (\(T=2\) by default), node states are pooled to \(z_{\text{gnn}}\in\mathbb{R}^{B\times d_{\text{gnn}}}\) (\(d_{\text{gnn}}=64\) default).
+Integration: \(z_{\text{gnn}}\) is concatenated with backbone and other branch embeddings.
 
 \textbf{Dynamic head fusion.}
 Motivation: enable strict ablations while keeping one unified model definition.
-Technical description: the FC input dimension is assembled dynamically from active components (backbone, raw landmarks, heatmap embedding, attention-derived feature, Sobel embedding, GNN embedding).
-Missing optional inputs are handled with zero-valued fallback tensors of matching shape, which keeps tensor dimensions deterministic across configurations.
-Integration: branch toggles change only this fusion composition, not the outer training pipeline.
+Technical description: the pre-classifier vector is assembled as
+\[
+z_{\text{all}}=[z_{\text{cnn}};L;z_{\text{att}};z_{\text{gnn}};z_{\text{sobel}}],
+\]
+where only active components are included, and the FC input dimension is computed programmatically as
+\[
+d_{\text{fc}}=d_{\text{cnn}}+\mathbb{1}_{L}d_L+\mathbb{1}_{\text{att}}d_{\text{att}}+\mathbb{1}_{\text{gnn}}d_{\text{gnn}}+\mathbb{1}_{\text{sobel}}d_{\text{sobel}}.
+\]
+For missing optional inputs (e.g., absent landmarks), zero tensors with matching shapes are injected to keep forward passes deterministic.
+Integration: branch toggles alter only \(z_{\text{all}}\) composition; training loop, optimizer, and loss interface remain unchanged.
 
 \subsection{B) Separate landmark-detector module}
 
