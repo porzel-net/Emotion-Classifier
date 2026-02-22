@@ -3,6 +3,8 @@ import csv
 import json
 import logging
 import shutil
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -29,6 +31,64 @@ SPLIT_MAP = {
     "valid": "test",
     "test": "test",
 }
+
+
+def format_duration(seconds: float) -> str:
+    if seconds < 0:
+        seconds = 0
+    total_seconds = int(seconds)
+    hours, rem = divmod(total_seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+@dataclass
+class ProgressTracker:
+    total: int
+    seen: int = 0
+    saved: int = 0
+    skipped: int = 0
+    start_time: float = field(default_factory=time.monotonic)
+    last_log_time: float = field(default_factory=lambda: 0.0)
+    log_interval_sec: float = 5.0
+
+    def update(self, saved: bool) -> None:
+        self.seen += 1
+        if saved:
+            self.saved += 1
+        else:
+            self.skipped += 1
+        self.log()
+
+    def log(self, force: bool = False) -> None:
+        if self.total == 0:
+            if force:
+                logging.info("Progress: 100.0%% (0/0) | saved=0 skipped=0 | elapsed=00:00 | ETA=00:00")
+            return
+
+        now = time.monotonic()
+        if not force and self.seen < self.total and (now - self.last_log_time) < self.log_interval_sec:
+            return
+
+        elapsed = now - self.start_time
+        rate = self.seen / elapsed if elapsed > 0 else 0.0
+        remaining = self.total - self.seen
+        eta = (remaining / rate) if rate > 0 else 0.0
+        percent = (self.seen / self.total) * 100.0
+
+        logging.info(
+            "Progress: %.1f%% (%d/%d) | saved=%d skipped=%d | elapsed=%s | ETA=%s",
+            percent,
+            self.seen,
+            self.total,
+            self.saved,
+            self.skipped,
+            format_duration(elapsed),
+            format_duration(eta),
+        )
+        self.last_log_time = now
 
 
 def parse_label_class(label_path: Path) -> int | None:
@@ -132,6 +192,23 @@ def unique_output_path(dest_dir: Path, base_name: str) -> Path:
         idx += 1
 
 
+def list_source_images(
+    source_root: Path,
+    source_split: str,
+    max_samples: int | None,
+) -> list[Path]:
+    images_dir = source_root / source_split / "images"
+    labels_dir = source_root / source_split / "labels"
+    if not images_dir.exists() or not labels_dir.exists():
+        logging.warning("Skipping missing split folders for %s", source_split)
+        return []
+
+    image_paths = [image_path for image_path in sorted(images_dir.glob("*")) if image_path.is_file()]
+    if max_samples is not None:
+        image_paths = image_paths[:max_samples]
+    return image_paths
+
+
 def process_split(
     model,
     detector,
@@ -139,51 +216,53 @@ def process_split(
     source_split: str,
     target_root: Path,
     target_size: int,
-    max_samples: int | None,
+    image_paths: list[Path],
+    progress: ProgressTracker,
 ) -> list[dict[str, str]]:
     metadata: list[dict[str, str]] = []
 
-    images_dir = source_root / source_split / "images"
     labels_dir = source_root / source_split / "labels"
-    if not images_dir.exists() or not labels_dir.exists():
-        logging.warning("Skipping missing split folders for %s", source_split)
+    if not labels_dir.exists():
+        logging.warning("Skipping missing labels folder for %s", source_split)
         return metadata
 
     target_split = SPLIT_MAP[source_split]
     processed = 0
 
-    for image_path in sorted(images_dir.glob("*")):
-        if max_samples is not None and processed >= max_samples:
-            break
-        if not image_path.is_file():
-            continue
+    for image_path in image_paths:
 
         label_path = labels_dir / f"{image_path.stem}.txt"
         class_id = parse_label_class(label_path)
         if class_id is None:
+            progress.update(saved=False)
             continue
 
         emotion_name = AFFECTNET_TO_FER.get(class_id)
         if emotion_name is None:
+            progress.update(saved=False)
             continue
 
         frame = cv2.imread(str(image_path))
         if frame is None:
             logging.warning("Skipped unreadable image %s", image_path)
+            progress.update(saved=False)
             continue
 
         face_bbox = detect_face_bbox(detector, frame)
         if face_bbox is None:
             logging.debug("No face detected for %s", image_path)
+            progress.update(saved=False)
             continue
 
         landmarks = detect_landmarks_in_face(model, frame, face_bbox)
         if landmarks is None:
             logging.debug("No landmarks detected for %s", image_path)
+            progress.update(saved=False)
             continue
 
         cropped_result = crop_from_landmarks(frame, landmarks)
         if cropped_result is None:
+            progress.update(saved=False)
             continue
 
         cropped, shifted_landmarks = cropped_result
@@ -197,7 +276,11 @@ def process_split(
         dest_dir.mkdir(parents=True, exist_ok=True)
         out_name_base = f"{source_split}__{image_path.stem}"
         out_path = unique_output_path(dest_dir, out_name_base)
-        cv2.imwrite(str(out_path), gray)
+        write_ok = cv2.imwrite(str(out_path), gray)
+        if not write_ok:
+            logging.warning("Failed to write output image %s", out_path)
+            progress.update(saved=False)
+            continue
 
         metadata.append(
             {
@@ -209,6 +292,7 @@ def process_split(
             }
         )
         processed += 1
+        progress.update(saved=True)
 
     logging.info("Processed %d samples from %s -> %s", processed, source_split, target_split)
     return metadata
@@ -233,6 +317,16 @@ def build_dataset(args):
     )
     detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
+    split_to_images: dict[str, list[Path]] = {}
+    total_candidates = 0
+    for split in ("train", "valid", "test"):
+        image_paths = list_source_images(source_root, split, args.max_per_split)
+        split_to_images[split] = image_paths
+        total_candidates += len(image_paths)
+
+    progress = ProgressTracker(total=total_candidates)
+    logging.info("Found %d input images for processing", total_candidates)
+
     metadata: list[dict[str, str]] = []
     for split in ("train", "valid", "test"):
         metadata.extend(
@@ -243,9 +337,12 @@ def build_dataset(args):
                 source_split=split,
                 target_root=target_root,
                 target_size=args.resize,
-                max_samples=args.max_per_split,
+                image_paths=split_to_images[split],
+                progress=progress,
             )
         )
+
+    progress.log(force=True)
 
     metadata_path = target_root / "metadata.csv"
     with metadata_path.open("w", newline="", encoding="utf-8") as handle:

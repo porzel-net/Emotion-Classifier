@@ -61,7 +61,7 @@ Download `Neconet_Weights3.pth` from your TODO URL and place it in:
 
 ## 3. Build the Modified FER Dataset
 
-Script: `prepare_data/prepare-fer2013.py`
+Script: `prepare_data/prepare_fer2013.py`
 
 Purpose:
 - reads FER data from `train/` and `test/` class folders,
@@ -71,7 +71,7 @@ Purpose:
 Example:
 
 ```bash
-python prepare_data/prepare-fer2013.py --device cpu
+python -m prepare_data.prepare_fer2013 --device cpu
 ```
 
 ### Parameters
@@ -83,7 +83,33 @@ python prepare_data/prepare-fer2013.py --device cpu
 | `--resize` | No | `48` | Output image size (`resize x resize`). |
 | `--device` | No | `cpu` | Device used by `face_alignment` (`cpu`, `mps`, `cuda`). |
 
-## 4. Folder Scoring to CSV
+## 4. Build the Modified AffectNet Dataset
+
+Script: `prepare_data/prepare_affectnet.py`
+
+Purpose:
+- reads AffectNet YOLO-format data from `train/`, `valid/`, and `test/`,
+- maps AffectNet classes to FER-style emotion folders,
+- detects landmarks and writes processed images plus `metadata.csv`.
+
+Example:
+
+```bash
+python -m prepare_data.prepare_affectnet --device cpu
+```
+
+### Parameters
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `--source` | No | `data/affectnet-yolo-format` | Input AffectNet root with split folders containing `images/` and `labels/`. |
+| `--target` | No | `data/affectnet-emotion-classifier-dataset` | Output root for FER-style train/test emotion folders and metadata. |
+| `--resize` | No | `64` | Output image size (`resize x resize`). |
+| `--device` | No | `cpu` | Device used by `face_alignment` (`cpu`, `mps`, `cuda`). |
+| `--max-per-split` | No | unlimited | Optional sample cap per source split for quick tests. |
+| `--overwrite` | No | `False` | Removes existing target folder before processing. |
+
+## 5. Folder Scoring to CSV
 
 Script: `scripts/score_folder.py`
 
@@ -117,7 +143,7 @@ python -m scripts.score_folder ./data/emotion-classifier-dataset/test/happy/ \
 | `--metadata-file` | No | `data/emotion-classifier-dataset/metadata.csv` | Landmark CSV used when `--use-landmarks` is enabled. |
 | `--metadata-root` | No | `.` | Root path for resolving metadata image paths. |
 
-## 5. Live Webcam/Video Prediction with explainable AI
+## 6. Live Webcam/Video Prediction with explainable AI
 
 Script: `visualize/predict_emotion.py`
 
@@ -154,7 +180,7 @@ python -m visualize.predict_emotion --video video.mov --output video-out.mov --e
 | `--occlusion-patch` | No | `8` | Patch size for occlusion explanation. |
 | `--occlusion-stride` | No | `4` | Patch stride for occlusion explanation. |
 
-## 6. Train a Custom Face Cropper
+## 7. Train a Custom Face Cropper
 
 Script: `train/train_cropping.py`
 
@@ -214,7 +240,7 @@ python -m train.train_cropping \
 | `--undersample-boundary-rate` | No | `0.0` | Fraction of near-boundary samples to drop. |
 | `--disable-reduce-lr` | No | `False` | Disables `ReduceLROnPlateau` callback. |
 
-## 7. K-Means Baseline Evaluation
+## 8. K-Means Baseline Evaluation
 
 Script: `train/train_kmeans_baseline.py`
 
@@ -266,7 +292,7 @@ python -m train.train_kmeans_baseline \
 | `--landmark-weight` | No | `1.0` | Scaling factor for landmark feature block. |
 | `--report-json` | No | disabled | Optional path for JSON report output. |
 
-## 8. Train a Custom Landmark Detector
+## 9. Train a Custom Landmark Detector
 
 Script: `train/train_landmarks_detector.py`
 
@@ -321,7 +347,7 @@ python -m train.train_landmarks_detector \
 | `--reduce-lr-patience` | No | `3` | Plateau patience (epochs). |
 | `--reduce-lr-min-lr` | No | `1e-6` | Minimum LR under plateau scheduler. |
 
-## 9. Notes
+## 10. Notes
 
 - `visualize/predict_emotion.py` requires either `--webcam` or `--video`.
 - `scripts/score_folder.py` expects a folder (not recursive).

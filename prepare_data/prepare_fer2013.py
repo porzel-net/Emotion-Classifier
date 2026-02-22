@@ -3,6 +3,8 @@ import csv
 import json
 import logging
 import shutil
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -12,6 +14,64 @@ from helpers.neconet_helpers import apply_sobel
 
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+
+def format_duration(seconds: float) -> str:
+    if seconds < 0:
+        seconds = 0
+    total_seconds = int(seconds)
+    hours, rem = divmod(total_seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+@dataclass
+class ProgressTracker:
+    total: int
+    seen: int = 0
+    saved: int = 0
+    skipped: int = 0
+    start_time: float = field(default_factory=time.monotonic)
+    last_log_time: float = field(default_factory=lambda: 0.0)
+    log_interval_sec: float = 5.0
+
+    def update(self, saved: bool) -> None:
+        self.seen += 1
+        if saved:
+            self.saved += 1
+        else:
+            self.skipped += 1
+        self.log()
+
+    def log(self, force: bool = False) -> None:
+        if self.total == 0:
+            if force:
+                logging.info("Progress: 100.0%% (0/0) | saved=0 skipped=0 | elapsed=00:00 | ETA=00:00")
+            return
+
+        now = time.monotonic()
+        if not force and self.seen < self.total and (now - self.last_log_time) < self.log_interval_sec:
+            return
+
+        elapsed = now - self.start_time
+        rate = self.seen / elapsed if elapsed > 0 else 0.0
+        remaining = self.total - self.seen
+        eta = (remaining / rate) if rate > 0 else 0.0
+        percent = (self.seen / self.total) * 100.0
+
+        logging.info(
+            "Progress: %.1f%% (%d/%d) | saved=%d skipped=%d | elapsed=%s | ETA=%s",
+            percent,
+            self.seen,
+            self.total,
+            self.saved,
+            self.skipped,
+            format_duration(elapsed),
+            format_duration(eta),
+        )
+        self.last_log_time = now
 
 
 def detect_landmarks(model, image):
@@ -36,7 +96,7 @@ def normalize_landmarks(landmarks, target_shape):
     return normalized
 
 
-def process_split(model, split_path, split_name, target_root, target_size):
+def process_split(model, split_path, split_name, target_root, target_size, progress):
     metadata = []
     for emotion_dir in sorted(split_path.iterdir()):
         if not emotion_dir.is_dir():
@@ -53,11 +113,13 @@ def process_split(model, split_path, split_name, target_root, target_size):
             frame = cv2.imread(str(image_path))
             if frame is None:
                 logging.warning("Skipped unreadable image %s", image_path)
+                progress.update(saved=False)
                 continue
 
             landmarks = detect_landmarks(model, frame)
             if landmarks is None:
                 logging.warning("No landmarks for %s", image_path)
+                progress.update(saved=False)
                 continue
 
             logging.debug(
@@ -79,16 +141,11 @@ def process_split(model, split_path, split_name, target_root, target_size):
             rel_output = (
                 dest_dir / image_path.name
             )
-            cv2.imwrite(str(rel_output), sobel_frame)
-
-            logging.info(
-                "Saved %s (%s/%s) resized=%dx%d",
-                rel_output.relative_to(target_root),
-                split_name,
-                emotion_dir.name,
-                target_size[0],
-                target_size[1],
-            )
+            write_ok = cv2.imwrite(str(rel_output), sobel_frame)
+            if not write_ok:
+                logging.warning("Failed to write output image %s", rel_output)
+                progress.update(saved=False)
+                continue
 
             metadata.append(
                 {
@@ -101,6 +158,7 @@ def process_split(model, split_path, split_name, target_root, target_size):
                     ),
                 }
             )
+            progress.update(saved=True)
     return metadata
 
 
@@ -124,12 +182,24 @@ def build_dataset(args):
 
     target_size = (args.resize, args.resize)
     metadata = []
+    split_paths: list[tuple[str, Path]] = []
+    total_candidates = 0
 
     for split_name in ["train", "test"]:
         split_path = input_root / split_name
         if not split_path.exists():
             logging.warning("Skipping missing split %s", split_path)
             continue
+        split_paths.append((split_name, split_path))
+        for emotion_dir in split_path.iterdir():
+            if not emotion_dir.is_dir():
+                continue
+            total_candidates += sum(1 for image_path in emotion_dir.glob("*") if image_path.is_file())
+
+    progress = ProgressTracker(total=total_candidates)
+    logging.info("Found %d input images for processing", total_candidates)
+
+    for split_name, split_path in split_paths:
         metadata.extend(
             process_split(
                 model,
@@ -137,8 +207,11 @@ def build_dataset(args):
                 split_name,
                 target_root,
                 target_size,
+                progress,
             )
         )
+
+    progress.log(force=True)
 
     metadata_path = target_root / "metadata.csv"
     with open(metadata_path, "w", newline="", encoding="utf-8") as handle:
