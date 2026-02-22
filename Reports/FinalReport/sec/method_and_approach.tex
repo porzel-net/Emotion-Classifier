@@ -6,9 +6,10 @@ Therefore, we combine a compact model with strict preprocessing, synchronized au
 
 \subsection{Data preparation pipeline}
 
-\paragraph{1) Unified dataset structure}
-\textit{Guiding idea: keep training inputs consistent across sources.}
-We prepare two different domains for training in one unified format with shared split/class structure.
+\paragraph{1) Combined FER2013 and AffectNet-8 training setup}
+\textit{Guiding idea: combine complementary datasets under one consistent training interface.}
+We prepare FER2013 and YOLO-cropped AffectNet-8 in a shared format with aligned splits and class mapping,
+so both datasets can be used in one joint training pipeline.
 
 \paragraph{2) Landmark metadata generation}
 \textit{Guiding idea: use facial landmarks to guide the model toward important facial points and to better handle faces that are not perfectly aligned.}
