@@ -1,4 +1,18 @@
 \section{Results}
 \label{sec:results}
 
-Presentation of results (tables, figures). Facts only, no interpretation.
+Best landmark-detector result: validation MAE = 4.
+Best face-cropper result: validation bbox MAE = 0.05.
+These MAE values refer to the validation set.
+
+Figure~\ref{fig:landmark_detector_results} shows qualitative predictions of the self-trained landmark detector on 9 samples (3$\times$3 grid), including predicted outputs and labels.
+In this panel, landmark localization is visibly successful for most samples.
+Some samples are only moderately cropped or landmarked.
+For \textit{Sample 36}, the facial landmarks are not detected.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{media/Landmark-Detecter-Results.jpeg}
+    \caption{Qualitative landmark-detector results on 9 samples. Most faces show stable landmark localization, while \textit{Sample 36} shows a clear miss.}
+    \label{fig:landmark_detector_results}
+\end{figure}

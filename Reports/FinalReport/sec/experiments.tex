@@ -2,5 +2,6 @@
 \label{sec:experiments}
 
 \textit{Metric focus.}
-Experiments are reported with Accuracy (\%), Macro Precision, Macro Recall, and Macro F1.
-Accuracy captures overall correctness, while the macro metrics weight all emotion classes equally and are therefore robust to class imbalance.
+For emotion classification, we use Accuracy (\%), Macro Precision, Macro Recall, and Macro F1.
+For the landmark detector, we use MAE; for the face cropper, we use bbox MAE.
+All metrics are tracked on both training and validation splits.

@@ -1,4 +1,7 @@
 \section{Discussion}
 \label{sec:discussion}
 
-Interpretation of results: what they mean, whether they match expectations, and what limitations remain.
+A plausible limitation is data diversity: faces that are not perfectly aligned or that deviate strongly from the dominant framing appear less robustly handled by the landmark detector.
+This is consistent with failures like \textit{Sample 36}, where landmarks are not recovered, while more regularly aligned faces are localized well.
+Since cropping and landmark quality are the foundation for the emotion classifier, we stopped further tuning of the self-trained detector/cropper setup.
+Instead, we switched to the prebuilt \texttt{face\_alignment} library (Bulat and Tzimiropoulos~\cite{bulat2017far}) and used its outer landmark coordinates for cropping.
