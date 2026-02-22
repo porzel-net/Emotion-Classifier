@@ -1,0 +1,29 @@
+\begin{thebibliography}{3}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Chen et~al.(2019)Chen, Xie, Huang, Rong, Ding, Huang, Xu, and
+  Huang]{chen2019progressive}
+Chaoqi Chen, Weiping Xie, Wenbing Huang, Yu Rong, Xinghao Ding, Yue Huang,
+  Tingyang Xu, and Junzhou Huang.
+\newblock Progressive feature alignment for unsupervised domain adaptation.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 627--636, 2019.
+
+\bibitem[Deng et~al.(2020)Deng, Guo, Ververas, Kotsia, and
+  Zafeiriou]{deng2020retinaface}
+Jiankang Deng, Jia Guo, Evangelos Ververas, Irene Kotsia, and Stefanos
+  Zafeiriou.
+\newblock Retinaface: Single-shot multi-level face localisation in the wild.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 5203--5212, 2020.
+
+\bibitem[Deng et~al.(2022)Deng, Li, Song, and Xiang]{deng2022bort2}
+Zhongying Deng, Da Li, Yi-Zhe Song, and Tao Xiang.
+\newblock Robust target training for multi-source domain adaptation.
+\newblock \emph{arXiv preprint arXiv:2210.01676}, 2022.
+
+\end{thebibliography}

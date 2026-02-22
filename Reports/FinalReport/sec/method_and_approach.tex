@@ -1,0 +1,35 @@
+\section{Method and Approach}
+\label{sec:data}
+
+Our approach follows one practical rule: with limited resources, data quality and training stability are primary levers.
+Therefore, we combine a compact model with strict preprocessing, synchronized augmentation, and modular feature fusion.
+
+\subsection{Data preparation pipeline}
+
+\paragraph{1) Unified dataset structure}
+\textit{Guiding idea: keep training inputs consistent across sources.}
+We prepare two different domains for training in one unified format with shared split/class structure.
+
+\paragraph{2) Landmark metadata generation}
+\textit{Guiding idea: use facial landmarks to guide the model toward important facial points and to better handle faces that are not perfectly aligned.}
+For each sample, facial landmark coordinates are extracted, scaled to target resolution, and normalized.
+The vectors are stored in \texttt{metadata.csv} so the model receives explicit spatial hints (e.g., around eyes, eyebrows, nose, and mouth) during geometry-appearance fusion.
+
+\paragraph{3) Signal shaping}
+\textit{Guiding idea: pass cleaner, more informative structure to the model earlier.}
+Before model ingestion, images can be transformed with fixed edge operators (Sobel, Roberts, Laplacian, or raw baseline).
+This creates a controlled preprocessing axis without changing classifier topology.
+
+\subsection{Geometry-consistent augmentation}
+
+\textit{Guiding idea: increase data diversity.}
+When an image is transformed, landmark coordinates are transformed with the same geometric mapping.
+Supported operations are random resized crop, rotation, translation, perspective warp, affine shear, and horizontal flip.
+Perspective uses homography mapping in homogeneous coordinates; affine operations use explicit matrix transforms.
+After transformation, coordinates are clipped and re-normalized.
+
+\subsection{Imbalance-aware optimization}
+
+\textit{Guiding idea: limit majority-class dominance in uneven datasets.}
+Class imbalance is addressed with two modes: class-balanced undersampling and inverse-frequency loss weighting.
+This balances gradient contributions across emotion classes without changing the core architecture.

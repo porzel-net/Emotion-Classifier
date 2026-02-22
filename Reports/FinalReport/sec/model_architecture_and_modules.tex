@@ -1,0 +1,74 @@
+\section{Model Architecture and Module Boundaries}
+\label{sec:architecture}
+
+\subsection{A) Central emotion-classification model}
+
+The central classifier is a lightweight ResNet-style architecture for grayscale $64\times64$ inputs.
+Key elements are a $3\times3$ stride-1 stem (Conv + BatchNorm + SiLU), four residual stages, adaptive average pooling, dropout, and a linear 6-class output.
+
+\paragraph{Optional internal branches of the central model}
+
+\textbf{Raw landmark fusion.}
+Motivation: inject explicit facial geometry with minimal parameter overhead.
+Technical description: the landmark tensor is flattened to a fixed $2N$ vector and passed directly to late fusion without extra nonlinear layers.
+This preserves exact coordinate information and avoids early compression artifacts.
+Integration: this branch is attached directly before the classifier head.
+
+\textbf{Multi-view heatmap branch.}
+Motivation: represent landmark information at multiple spatial scales.
+Technical description: landmarks are projected into Gaussian heatmaps with multiple $\sigma$ values:
+\[
+H_k(x,y)=\sum_{i=1}^{N}\exp\left(-\frac{(x-x_i)^2+(y-y_i)^2}{2\sigma_k^2+\epsilon}\right).
+\]
+Coordinates are clamped to the valid image grid before rasterization, then stacked maps are processed by a compact CNN
+(Conv-BN-SiLU blocks with global pooling) into a dense embedding.
+Integration: the pooled heatmap feature is appended to the head input.
+
+\textbf{Landmark-guided attention.}
+Motivation: amplify expression-relevant regions before deep feature extraction.
+Technical description: image and heatmaps are fused to predict an attention mask $A(x,y)$ and apply
+\[
+\tilde{I}(x,y)=I(x,y)\cdot(1+A(x,y)).
+\]
+The mask is produced by a small Conv-BN-SiLU stack followed by Sigmoid, so modulation remains bounded and stable.
+Integration: this modulation is applied in the main image path before deeper backbone stages, and an optional pooled feature from the fused tensor is also exposed to the classifier head.
+
+\textbf{Sobel feature branch.}
+Motivation: preserve high-frequency edge structure as a complementary cue.
+Technical description: fixed Sobel kernels compute $G_x$ and $G_y$, then gradient magnitude is formed as
+\[
+M=\sqrt{G_x^2+G_y^2+\epsilon}.
+\]
+Inputs are first remapped from normalized range to $[0,1]$, and $M$ is normalized per sample by its spatial maximum.
+The resulting edge map is encoded by a dedicated compact convolutional branch (Conv-BN-SiLU, global pooling).
+Integration: the resulting Sobel embedding is concatenated in the same head-level fusion vector.
+
+\textbf{Landmark GNN branch.}
+Motivation: capture relational geometry between landmarks, not only absolute coordinates.
+Technical description: landmarks are treated as graph nodes with 2D coordinates, linearly projected to hidden embeddings, and updated for multiple message-passing rounds.
+Each round applies a shared message MLP, mean-aggregates node context, concatenates local and global context, and updates node states with a nonlinear projection.
+Final graph features are obtained through global pooling over nodes.
+Integration: the pooled graph embedding is injected into the classifier head with other branch features.
+
+\textbf{Dynamic head fusion.}
+Motivation: enable strict ablations while keeping one unified model definition.
+Technical description: the FC input dimension is assembled dynamically from active components (backbone, raw landmarks, heatmap embedding, attention-derived feature, Sobel embedding, GNN embedding).
+Missing optional inputs are handled with zero-valued fallback tensors of matching shape, which keeps tensor dimensions deterministic across configurations.
+Integration: branch toggles change only this fusion composition, not the outer training pipeline.
+
+\subsection{B) Separate landmark-detector module}
+
+A dedicated landmark regressor is trained as an independent model.
+It uses direct coordinate regression ($2\times$number of keypoints), affine+noise augmentation, and standard regression optimization.
+Its purpose is geometric keypoint estimation as a separate task module.
+
+\subsection{C) Separate face-cropper module}
+
+A dedicated face-cropper is trained as a separate multi-task model with two outputs: face confidence and normalized bounding box coordinates.
+It supports alternative backbones, boundary-aware bbox loss variants, and geometric/photometric augmentation.
+Its purpose is robust face localization as an upstream module.
+
+\subsection{D) Separate K-Means module (creative first idea)}
+
+An original idea was pure non-neural classification via K-Means as a baseline module.
+The concept is to use fixed feature spaces (flattened image features, optionally extended with landmarks), cluster into six groups, and map clusters to emotion labels.
