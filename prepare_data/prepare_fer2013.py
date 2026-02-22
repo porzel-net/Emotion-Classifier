@@ -15,6 +15,8 @@ from helpers.neconet_helpers import apply_sobel
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
+EXCLUDED_EMOTIONS = {"neutral"}
+
 
 def format_duration(seconds: float) -> str:
     if seconds < 0:
@@ -100,6 +102,9 @@ def process_split(model, split_path, split_name, target_root, target_size, progr
     metadata = []
     for emotion_dir in sorted(split_path.iterdir()):
         if not emotion_dir.is_dir():
+            continue
+        if emotion_dir.name.lower() in EXCLUDED_EMOTIONS:
+            logging.info("Skipping excluded class %s/%s", split_name, emotion_dir.name)
             continue
 
         dest_dir = target_root / split_name / emotion_dir.name
@@ -193,6 +198,8 @@ def build_dataset(args):
         split_paths.append((split_name, split_path))
         for emotion_dir in split_path.iterdir():
             if not emotion_dir.is_dir():
+                continue
+            if emotion_dir.name.lower() in EXCLUDED_EMOTIONS:
                 continue
             total_candidates += sum(1 for image_path in emotion_dir.glob("*") if image_path.is_file())
 

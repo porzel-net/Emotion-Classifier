@@ -20,7 +20,7 @@ AFFECTNET_TO_FER = {
     2: "disgusted",
     3: "fearful",
     4: "happy",
-    5: "neutral",
+    5: None,  # neutral is intentionally excluded from the 6-class setup
     6: "sad",
     7: "surprised",
 }
