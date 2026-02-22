@@ -118,9 +118,11 @@ python -m prepare_data.prepare_affectnet --device cpu
 Script: `scripts/score_folder.py`
 
 Purpose:
-- classifies all images in one folder,
+- classifies all images in one folder (recursive scan),
 - writes one CSV row per image,
-- outputs class probabilities.
+- outputs class probabilities,
+- runs face analysis before scoring (landmark detection + face crop),
+- and, when required by the checkpoint, builds landmark vectors directly from the detected face (no `metadata.csv` needed).
 
 Example:
 
@@ -134,18 +136,19 @@ python -m scripts.score_folder ./data/fer2013-prepared/test/happy/ \
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `images` (positional) | Yes | - | Folder containing images to score. |
+| `images` (positional) | Yes | - | Folder containing images to score (recursive search). |
 | `--output`, `-o` | No | `predictions.csv` | Output CSV file path (overwrites if exists). |
 | `--weights`, `--weights-dir` | No | `models/emotion-classifier-best.pth` | Checkpoint file path. |
 | `--device` | No | auto | Torch device (`cpu`, `mps`, `cuda`). |
 | `--filter` | No | `sobel` | Input preprocessing (`sobel`, `roberts`, `laplacian`, `none`). |
-| `--width-multiplier` | No | `1.0` | Width multiplier used in the trained model architecture. |
-| `--use-landmarks` | No | `False` | Enables landmark input branch. |
-| `--use-gnn` | No | `False` | Enables GNN processing over landmarks. |
-| `--gnn-hidden-dim` | No | `64` | GNN hidden dimension (must match training). |
+| `--width-multiplier` | No | auto | Optional override; usually inferred from checkpoint. |
+| `--use-landmarks` | No | `False` | Compatibility flag; branch usage is inferred from checkpoint. |
+| `--use-gnn` | No | `False` | Compatibility flag; branch usage is inferred from checkpoint. |
+| `--gnn-hidden-dim` | No | auto | Optional override; usually inferred from checkpoint. |
 | `--gnn-steps` | No | `2` | Number of GNN message-passing steps. |
-| `--metadata-file` | No | `data/fer2013-prepared/metadata.csv` | Landmark CSV used when `--use-landmarks` is enabled. |
-| `--metadata-root` | No | `.` | Root path for resolving metadata image paths. |
+| `--face-device` | No | auto | Device used by `face_alignment` (`cpu`, `cuda`). |
+| `--crop-pad` | No | `0.08` | Padding ratio around landmark bounding box before crop. |
+| `--no-face-analysis` | No | `False` | Disable landmark detection + face crop pre-processing. |
 
 ## 6. Live Webcam/Video Prediction with explainable AI
 
@@ -517,5 +520,5 @@ python -m train.train_landmarks_detector \
 ## 11. Notes
 
 - `visualize/predict_emotion.py` requires either `--webcam` or `--video`.
-- `scripts/score_folder.py` expects a folder (not recursive).
-- For landmark-aware inference/evaluation, ensure `metadata.csv` exists from dataset preparation.
+- `scripts/score_folder.py` searches image files recursively.
+- `scripts/score_folder.py` computes landmarks and face crops directly at inference time (no `metadata.csv` required).

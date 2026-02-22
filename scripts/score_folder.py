@@ -36,6 +36,7 @@ CSV_COLUMNS = ["filepath", "happiness", "surprise", "sadness", "anger", "disgust
 CSV_ORDER = ["Happiness", "Surprise", "Sadness", "Anger", "Disgust", "Fear"]
 CLASS_ORDER = ["angry", "disgusted", "fearful", "happy", "sad", "surprised"]
 DEFAULT_MODEL_WEIGHTS = Path("models/emotion-classifier-best.pth")
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 
 FILTER_TRANSFORMS = {
     "sobel": transforms.Lambda(apply_sobel_to_pil),
@@ -47,9 +48,9 @@ FILTER_TRANSFORMS = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Score each image in a folder and emit CSV probabilities."
+        description="Score each image in a folder (recursive) and emit CSV probabilities."
     )
-    parser.add_argument("images", type=Path, help="Folder containing input images.")
+    parser.add_argument("images", type=Path, help="Folder containing input images (searched recursively).")
     parser.add_argument(
         "--output",
         "-o",
@@ -403,6 +404,14 @@ def reorder_probs(probs: list[float]) -> list[float]:
     return [probs[order_map[label]] for label in CSV_ORDER]
 
 
+def collect_image_paths(root: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+    )
+
+
 def main() -> None:
     args = parse_args()
     logging.basicConfig(
@@ -441,9 +450,9 @@ def main() -> None:
     else:
         LOGGER.info("Face analysis disabled via --no-face-analysis.")
 
-    image_paths = sorted(p for p in args.images.iterdir() if p.is_file())
+    image_paths = collect_image_paths(args.images)
     if not image_paths:
-        raise FileNotFoundError(f"No images found in {args.images}")
+        raise FileNotFoundError(f"No image files found under {args.images} (recursive search).")
 
     rows: list[tuple[str, list[float]]] = []
     skipped = 0
