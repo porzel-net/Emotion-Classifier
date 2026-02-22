@@ -16,6 +16,8 @@ After introducing a custom transformation, \(30\) epochs were no longer sufficie
 
 Furthermore, a landmark model and a new dataset were introduced. After renewed overfitting was observed, additional functions were implemented to improve test accuracy: a Sobel feature branch (separate CNN path for edge information) and width-multiplier support to simplify experiments with different image resolutions, which also influences regularization behavior implicitly.
 
+In addition to scalar metrics (Accuracy, Precision, Recall, and \(F_1\)), we use a confusion matrix for class-wise error analysis, so misclassification structure can be inspected beyond aggregate scores.
+
 Figure~\ref{fig:landmark_detector_results} shows qualitative predictions of the self-trained landmark detector on 9 samples (3$\times$3 grid), including predicted outputs and labels.
 In this panel, landmark localization is visibly successful for most samples.
 Some samples are only moderately cropped or landmarked.
