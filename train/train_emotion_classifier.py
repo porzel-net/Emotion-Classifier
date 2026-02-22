@@ -525,7 +525,7 @@ class LandmarkAwareEmotionFolder(EmotionFolderWithPaths):
     def _lookup_landmarks(self, path: str) -> torch.Tensor:
         key = _metadata_key(Path(path), self.metadata_root)
         vector = self.metadata_map.get(key)
-        if vector is None or vector.size == 0:
+        if vector is None or vector.size == 0 or vector.size != self.landmark_dim:
             return torch.zeros(self.landmark_dim, dtype=torch.float32)
         return torch.from_numpy(vector)
 
@@ -789,28 +789,100 @@ def build_dataloaders(
         sampled = train_dataset
 
     sampled_counts = _count_targets(sampled)
-
-    train_subset, val_subset = _split_dataset(sampled, args.val_split)
-
     pin_memory = device.type == "cuda"
-    train_loader = DataLoader(
-        dataset=train_subset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=0,
-        pin_memory=pin_memory,
-    )
-    val_loader = (
-        DataLoader(
-            dataset=val_subset,
+
+    val_loader: Optional[DataLoader] = None
+    if args.val_data_root is None:
+        train_subset, val_subset = _split_dataset(sampled, args.val_split)
+        train_loader = DataLoader(
+            dataset=train_subset,
+            batch_size=args.batch_size,
+            shuffle=True,
+            num_workers=0,
+            pin_memory=pin_memory,
+        )
+        if val_subset is not None:
+            val_loader = DataLoader(
+                dataset=val_subset,
+                batch_size=args.batch_size,
+                shuffle=False,
+                num_workers=0,
+                pin_memory=pin_memory,
+            )
+    else:
+        val_root = args.val_data_root
+        val_split_root = val_root / args.val_data_split
+        if not val_split_root.exists():
+            raise FileNotFoundError(
+                f"Validation split folder not found: {val_split_root}"
+            )
+        if args.val_split > 0:
+            logging.info(
+                "External validation set is active (%s). Ignoring --val-split=%.2f.",
+                val_split_root,
+                args.val_split,
+            )
+
+        train_loader = DataLoader(
+            dataset=sampled,
+            batch_size=args.batch_size,
+            shuffle=True,
+            num_workers=0,
+            pin_memory=pin_memory,
+        )
+
+        if use_landmarks:
+            val_metadata_file = args.val_metadata_file
+            if val_metadata_file is None:
+                val_metadata_file = val_root / "metadata.csv"
+            val_metadata_map: dict[str, np.ndarray] = {}
+            if val_metadata_file.exists():
+                val_metadata_map, val_landmark_dim = load_landmark_metadata(
+                    val_metadata_file, val_root
+                )
+                if val_landmark_dim and val_landmark_dim != landmark_dim:
+                    logging.warning(
+                        "Validation landmark dimension (%d) differs from training (%d). "
+                        "Mismatched entries are zero-filled.",
+                        val_landmark_dim,
+                        landmark_dim,
+                    )
+            else:
+                logging.warning(
+                    "Validation metadata %s not found; validation landmarks are zero-filled.",
+                    val_metadata_file,
+                )
+
+            val_dataset = LandmarkAwareEmotionFolder(
+                root=val_split_root,
+                transform=None,
+                metadata_map=val_metadata_map,
+                metadata_root=val_root,
+                landmark_dim=landmark_dim,
+                filter_name=args.filter,
+                augment_rotation=False,
+                augment_scale=False,
+                augment_translation=False,
+                augment_perspective=False,
+                augment_erasing=False,
+                augment_noise=False,
+                noise_std=args.noise_std,
+                train_mode=False,
+            )
+        else:
+            val_dataset = EmotionFolderWithPaths(
+                root=val_split_root,
+                transform=eval_transform,
+            )
+
+        filter_classes(val_dataset)
+        val_loader = DataLoader(
+            dataset=val_dataset,
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=0,
             pin_memory=pin_memory,
         )
-        if val_subset is not None
-        else None
-    )
 
     if use_landmarks:
         test_dataset = LandmarkAwareEmotionFolder(
@@ -1007,6 +1079,18 @@ def log_model_summary(model: nn.Module) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train and evaluate the lightweight Neconet ResNet variants.")
     parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="Path to emotion-classifier-dataset")
+    parser.add_argument(
+        "--val-data-root",
+        type=Path,
+        default=None,
+        help="Optional separate dataset root used only for validation (contains split folders like test/).",
+    )
+    parser.add_argument(
+        "--val-data-split",
+        type=str,
+        default="test",
+        help="Split name inside --val-data-root used as validation set (default: test).",
+    )
     parser.add_argument("--epochs", type=int, default=NUM_EPOCHS)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--lr", type=float, default=LEARNING_RATE)
@@ -1055,6 +1139,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_METADATA,
         help="CSV containing landmark annotations.",
+    )
+    parser.add_argument(
+        "--val-metadata-file",
+        type=Path,
+        default=None,
+        help="Optional CSV with landmark annotations for --val-data-root (default: <val-data-root>/metadata.csv).",
     )
     parser.add_argument("--device", type=str, default=None, help="Override training device (cuda/cpu/mps).")
     parser.add_argument(
