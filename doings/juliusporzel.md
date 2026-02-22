@@ -61,6 +61,6 @@
 ## Reports and Documentation
 - Researched the data strategy for the Preliminary Report.
 - Wrote the Preliminary Report (except metrics section).
-- Built and extended the Final Report:
+- Built and extended the Final Report (as team with Memo and Necati):
   - Method & Approach, Experiments, Results, Discussion/Conclusion/Outlook.
 - Refactored the project comprehensively for submission (including `README.md`, etc.).
