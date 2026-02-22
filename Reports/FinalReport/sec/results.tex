@@ -1,6 +1,18 @@
 \section{Results}
 \label{sec:results}
 
+After our early experiments, a middle learning rate of 0.001 was observed to produce the best test accuracy with other rates performing between 64-66% test accuracy compared to 0.001’s maximum 68%. For our later tests the best performing learning rate of 0.001 was kept throughout every test as we experimented to figure out the most optimum values for other parameters.
+
+It was noted that the best performing rates were 0.3 and 0.35 as smaller dropout rates led to overfitting and weak regularization and higher dropout rates led to underfitting as the network became too weak without key neurons. Even though 0.35 gave us the best test accuracy of 67,94% a slightly smaller dropout rate of 0.30 was chosen instead as it produced better results more consistently and had a better average test accuracy. 
+
+It was analyzed that the bigger weight decay rate of 1e-3 generally performed better as smaller rates led to lower test accuracy on our test data despite the similar train accuracy rates therefore overfitting. It was noted that the smaller weight decay rates of 1e-4 and 1e-5 were too tiny of a penalty and didn’t have much effect which led to weak regularization. 
+
+The batch size of 64 helped with generalization but resulted in more noisier gradients with a slow training, and in contrast the batch size of 256 caused worse generalization so a good middle spot of 128 was chosen for our final model. 
+
+After training our model for 40 epochs we realized that the accuracy improved up to 70%. After training it for another 10 epochs we managed to improve it a further 2.5% but also noticed that the model leads to overfitting with a big margin between training and test accuracies. 
+
+After increasing the epoch count, we noticed the F1-score improving up to 0,69 from its initial 0,59 with similar precision and recall values, with no major bias towards one error type which indicates that we have a balanced model. Our final model with the landmark model and the helped functions implemented increased our model’s accuracy by 4,5% with our test accuracy going up to 76,75% from the previous 72,24%. 
+
 Best landmark-detector result: validation MAE = 4.
 Best face-cropper result: validation bbox MAE = 0.05.
 These MAE values refer to the validation set.
