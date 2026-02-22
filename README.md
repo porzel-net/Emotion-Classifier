@@ -1,5 +1,7 @@
 # Emotion Classifier
 
+The `doings/` folder contains each team member's individual doings.
+
 The repository contains a full facial-emotion pipeline built around:
 - dataset preparation,
 - model inference for images/videos/webcam,
@@ -149,6 +151,51 @@ python -m scripts.score_folder ./data/fer2013-prepared/test/happy/ \
 | `--face-device` | No | auto | Device used by `face_alignment` (`cpu`, `cuda`). |
 | `--crop-pad` | No | `0.08` | Padding ratio around landmark bounding box before crop. |
 | `--no-face-analysis` | No | `False` | Disable landmark detection + face crop pre-processing. |
+
+### 5.1 Validation Confusion Matrix
+
+Script: `scripts/evaluate_confusion_matrix.py`
+
+Purpose:
+- evaluates a labeled validation/test split,
+- computes a confusion matrix from ground-truth class folders,
+- writes confusion matrix as PNG and CSV,
+- uses landmark vectors from `metadata.csv` when available (recommended for prepared datasets),
+- and falls back to face analysis only when metadata is unavailable (unless disabled).
+
+Example:
+
+```bash
+python -m scripts.evaluate_confusion_matrix data/fer2013-prepared/test \
+  --weights-dir models/emotion-classifier-best.pth \
+  --device mps \
+  --metadata-file data/fer2013-prepared/metadata.csv \
+  --metadata-root data/fer2013-prepared \
+  --no-face-analysis \
+  --output-image confusion_matrix_test.png \
+  --output-csv confusion_matrix_test.csv
+```
+
+### Parameters
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `dataset` (positional) | Yes | - | Split folder with class subfolders (`angry`, `disgusted`, `fearful`, `happy`, `sad`, `surprised`), scanned recursively. |
+| `--output-image` | No | `confusion_matrix.png` | Output PNG path for rendered confusion matrix. |
+| `--output-csv` | No | `confusion_matrix.csv` | Output CSV path with matrix counts. |
+| `--weights`, `--weights-dir` | No | `models/emotion-classifier-best.pth` | Checkpoint file path. |
+| `--device` | No | auto | Torch device (`cpu`, `mps`, `cuda`). |
+| `--filter` | No | `sobel` | Input preprocessing (`sobel`, `roberts`, `laplacian`, `none`). |
+| `--width-multiplier` | No | auto | Optional override; usually inferred from checkpoint. |
+| `--use-landmarks` | No | `False` | Compatibility flag; branch usage is inferred from checkpoint. |
+| `--use-gnn` | No | `False` | Compatibility flag; branch usage is inferred from checkpoint. |
+| `--gnn-hidden-dim` | No | auto | Optional override; usually inferred from checkpoint. |
+| `--gnn-steps` | No | `2` | Number of GNN message-passing steps. |
+| `--metadata-file` | No | auto | Landmark metadata CSV (defaults to `<dataset_parent>/metadata.csv`). |
+| `--metadata-root` | No | auto | Base path for resolving `image_path` values from metadata (defaults to dataset parent). |
+| `--face-device` | No | auto | Device used by `face_alignment` (`cpu`, `cuda`). |
+| `--crop-pad` | No | `0.08` | Padding ratio around landmark bounding box before crop. |
+| `--no-face-analysis` | No | `False` | Disable landmark detection + face crop fallback when metadata is missing. |
 
 ## 6. Live Webcam/Video Prediction with explainable AI
 
@@ -522,3 +569,4 @@ python -m train.train_landmarks_detector \
 - `visualize/predict_emotion.py` requires either `--webcam` or `--video`.
 - `scripts/score_folder.py` searches image files recursively.
 - `scripts/score_folder.py` computes landmarks and face crops directly at inference time (no `metadata.csv` required).
+- `scripts/evaluate_confusion_matrix.py` expects class subfolders inside the provided split folder.
