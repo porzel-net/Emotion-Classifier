@@ -66,20 +66,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-gnn", action="store_true", help="Compatibility flag.")
     parser.add_argument("--gnn-hidden-dim", type=int, default=None, help="Optional GNN hidden dim override.")
     parser.add_argument("--gnn-steps", type=int, default=2, help="GNN message steps.")
-    parser.add_argument("--face-device", default=None, help="Device for face landmark extraction (cpu/cuda).")
-    parser.add_argument("--crop-pad", type=float, default=0.08, help="Padding ratio around landmark crop.")
     parser.add_argument(
         "--metadata-file",
         type=Path,
         default=None,
-        help="Optional landmark metadata CSV. Defaults to <dataset_parent>/metadata.csv when available.",
+        help="Compatibility flag; not used (landmarks are computed online when face analysis is enabled).",
     )
     parser.add_argument(
         "--metadata-root",
         type=Path,
         default=None,
-        help="Base path for resolving metadata image_path keys (default: parent of dataset folder).",
+        help="Compatibility flag; not used (landmarks are computed online when face analysis is enabled).",
     )
+    parser.add_argument("--face-device", default=None, help="Device for face landmark extraction (cpu/cuda).")
+    parser.add_argument("--crop-pad", type=float, default=0.08, help="Padding ratio around landmark crop.")
     parser.add_argument(
         "--no-face-analysis",
         action="store_true",
@@ -190,6 +190,8 @@ def main() -> None:
     model, landmark_dim = build_evaluation_model(args, device)
     expects_landmarks = bool(getattr(model, "_expects_landmarks", False))
     LOGGER.info("Model expects landmarks: %s (dim=%d)", expects_landmarks, landmark_dim)
+    if args.metadata_file is not None or args.metadata_root is not None:
+        LOGGER.info("Ignoring --metadata-file/--metadata-root (not required by this script).")
 
     metadata_root = args.metadata_root or args.dataset.parent
     metadata_file = args.metadata_file or (args.dataset.parent / "metadata.csv")

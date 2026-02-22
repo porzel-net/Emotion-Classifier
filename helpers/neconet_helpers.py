@@ -231,17 +231,50 @@ def _layer4_channels(state: dict[str, torch.Tensor]) -> int:
     return int(tensor.shape[0])
 
 
+def _infer_width_multiplier(state: dict[str, torch.Tensor]) -> float:
+    channel_observations: list[tuple[int, int]] = []
+    key_to_base = {
+        "conv1.weight": 64,
+        "layer1.0.conv1.weight": 64,
+        "layer2.0.conv1.weight": 128,
+        "layer3.0.conv1.weight": 256,
+        "layer4.0.conv1.weight": 512,
+    }
+    for key, base in key_to_base.items():
+        tensor = state.get(key)
+        if tensor is None or tensor.ndim != 4:
+            continue
+        channel_observations.append((int(tensor.shape[0]), base))
+
+    if not channel_observations:
+        conv1 = state.get("conv1.weight")
+        if conv1 is None or conv1.ndim != 4:
+            raise KeyError("Unable to infer width multiplier from checkpoint.")
+        return max(0.25, float(conv1.shape[0]) / 64.0)
+
+    low = 0.25
+    high = float("inf")
+    for observed, base in channel_observations:
+        low = max(low, observed / float(base))
+        high = min(high, (observed + 1) / float(base))
+
+    if low < high:
+        return (low + high) / 2.0
+
+    # Fallback for inconsistent checkpoints: satisfy the strongest lower bound.
+    return low + 1e-6
+
+
 def _infer_emotion_resnet_kwargs(
     state: dict[str, torch.Tensor],
     logger: Optional[logging.Logger] = None,
 ) -> dict[str, Any]:
     logger = logger or LOGGER
-    conv1 = state.get("conv1.weight")
     fc_weight = state.get("fc.weight")
-    if conv1 is None or fc_weight is None:
-        raise KeyError("Checkpoint is missing required keys (conv1.weight/fc.weight).")
+    if fc_weight is None:
+        raise KeyError("Checkpoint is missing required key (fc.weight).")
 
-    width_multiplier = max(0.25, float(conv1.shape[0]) / 64.0)
+    width_multiplier = _infer_width_multiplier(state)
     num_classes = int(fc_weight.shape[0])
     fc_input_dim = int(fc_weight.shape[1])
     backbone_dim = _layer4_channels(state)
