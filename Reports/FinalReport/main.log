@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14)  22 FEB 2026 23:17
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14)  22 FEB 2026 23:27
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -650,14 +650,14 @@ Package pdftex.def Info: media/Model-Performance-Comparison.jpeg  used on input
 File: media/Effect of Dropout on Generalization.jpeg Graphic file (type jpg)
 <use media/Effect of Dropout on Generalization.jpeg>
 Package pdftex.def Info: media/Effect of Dropout on Generalization.jpeg  used o
-n input line 10.
+n input line 12.
 (pdftex.def)             Requested size: 237.13594pt x 143.89961pt.
 <media/Weight-Decay-Regularization-Effect.jpeg, id=105, 1606.0pt x 978.65625pt>
 
 File: media/Weight-Decay-Regularization-Effect.jpeg Graphic file (type jpg)
 <use media/Weight-Decay-Regularization-Effect.jpeg>
 Package pdftex.def Info: media/Weight-Decay-Regularization-Effect.jpeg  used on
- input line 19.
+ input line 22.
 (pdftex.def)             Requested size: 237.13594pt x 144.4924pt.
 <media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg, id=106, 16
 06.0pt x 965.6075pt>
@@ -665,13 +665,13 @@ File: media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg Graphi
 c file (type jpg)
 <use media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg>
 Package pdftex.def Info: media/Performance-After-Custom-Transformation-(Optimal
- Setup).jpeg  used on input line 30.
+ Setup).jpeg  used on input line 35.
 (pdftex.def)             Requested size: 237.13594pt x 142.56584pt.
 <media/Confusion-Matrix-Fer2013-Neconet.png, id=107, 578.16pt x 505.89pt>
 File: media/Confusion-Matrix-Fer2013-Neconet.png Graphic file (type png)
 <use media/Confusion-Matrix-Fer2013-Neconet.png>
 Package pdftex.def Info: media/Confusion-Matrix-Fer2013-Neconet.png  used on in
-put line 39.
+put line 45.
 (pdftex.def)             Requested size: 237.13594pt x 207.49342pt.
  [4 <./media/Landmark-Detecter-Results.jpeg> <./media/Model-Performance-Compari
 son.jpeg> <./media/Effect of Dropout on Generalization.jpeg> <./media/Weight-De
@@ -689,12 +689,12 @@ Missing character: There is no m in font nullfont!
 Missing character: There is no e in font nullfont!
 Missing character: There is no n in font nullfont!
 Missing character: There is no t in font nullfont!
-) (./main.bbl (./main.brf)
+[5 <./media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg> <./me
+dia/Confusion-Matrix-Fer2013-Neconet.png>]) (./main.bbl (./main.brf)
 \tf@brf=\write4
 \openout4 = `main.brf'.
 
- [5 <./media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg> <./m
-edia/Confusion-Matrix-Fer2013-Neconet.png>]) [6
+) [6
 
 ]
 (./main.aux)
@@ -714,7 +714,7 @@ Here is how much of TeX's memory you used:
  43836 multiletter control sequences out of 15000+600000
  654042 words of font info for 95 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 90i,9n,93p,885b,525s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 90i,9n,93p,885b,460s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmex1
 0.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/cm/c
 mmi10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/
@@ -732,7 +732,7 @@ fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2025basic/te
 xmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2025basic/texmf-d
 ist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2025basic/texmf-dist/f
 onts/type1/urw/times/utmri8a.pfb>
-Output written on main.pdf (6 pages, 1299450 bytes).
+Output written on main.pdf (6 pages, 1299918 bytes).
 PDF statistics:
  212 PDF objects out of 1000 (max. 8388607)
  162 compressed objects within 2 object streams

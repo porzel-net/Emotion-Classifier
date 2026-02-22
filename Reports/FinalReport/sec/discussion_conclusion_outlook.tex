@@ -5,15 +5,26 @@ A plausible limitation is data diversity: faces that are not perfectly aligned o
 This is consistent with failures like \textit{Sample 36}, where landmarks are not recovered, while more regularly aligned faces are localized well.
 Since cropping and landmark quality are the foundation for the emotion classifier, we stopped further tuning of the self-trained detector/cropper setup.
 Instead, we switched to the prebuilt \texttt{face\_alignment} library (Bulat and Tzimiropoulos~\cite{bulat2017far}) and used its outer landmark coordinates for cropping.
+\vspace{0.35em}
 
 Our experiments highlighted the sensitivity of facial expression recognition models to hyperparameters and regularization strategies. The learning rate proved particularly important; while rates between \( 0.0003 \) and \( 0.003 \) were tested, \( 0.001 \) consistently yielded the best test accuracy, emphasizing the need for careful tuning to balance convergence speed and stability.
+\vspace{0.35em}
 
 Regularization played a key role in controlling overfitting. Dropout rates around \( 0.3 \text{--} 0.35 \) provided the best trade-off between maintaining network capacity and preventing over-reliance on individual neurons. Choosing \( 0.3 \) over \( 0.35 \) prioritized consistent performance across multiple runs, rather than peak accuracy in a single experiment. Similarly, \( L_2 \) weight decay of \( 1 \times 10^{-3} \) effectively constrained parameter growth and reduced overfitting, while smaller decay rates were too weak to meaningfully influence generalization.
+\vspace{0.35em}
 
 The choice of training duration and batch size also had a significant impact. Training for \( 40 \text{--} 50 \) epochs allowed the model to fully exploit the dataset and improve accuracy up to \( 70 \text{--} 72\% \), though extending beyond \( 50 \) epochs led to overfitting. A batch size of \( 128 \) offered a good balance, providing stable gradient updates without sacrificing generalization, whereas smaller batch sizes slowed convergence and larger ones hurt test performance.
+\vspace{0.35em}
 
 Custom transformations and feature enhancements, such as the Sobel branch and landmark model, further improved the model’s performance. These additions allowed the network to capture more discriminative information, which was reflected in the improvement of the \( F_1 \)-score from \( 0.59 \) to \( 0.69 \). Precision and recall remained balanced, suggesting that the model does not favor certain classes or error types, indicating robust generalization across the six emotion categories.
+\vspace{0.35em}
+
+Observation: pure signal shaping applied to the single input image led to faster early accuracy gains, but lower final overall accuracy.
+
+Interpretation: this behavior likely indicates that aggressive signal shaping removes part of the discriminative information needed for late-stage class separation, even if early optimization becomes easier.
+\vspace{0.35em}
 
 The confusion-matrix structure shows that emotionally close categories are still the main failure mode: fear is frequently confused with sadness and anger, while happiness remains the most separable class. This pattern is consistent with overlap in facial cues between negative-valence expressions and suggests that further gains will likely come from stronger class-separation features rather than global optimization changes alone.
+\vspace{0.35em}
 
 Overall, our experiments show that systematic hyperparameter tuning, proper regularization, and targeted feature enhancements can significantly improve model generalization and stability. The combination of these strategies allowed us to achieve reliable performance while mitigating overfitting, demonstrating that careful experimentation is crucial for optimizing facial emotion recognition models.
