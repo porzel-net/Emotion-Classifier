@@ -570,3 +570,7 @@ python -m train.train_landmarks_detector \
 - `scripts/score_folder.py` searches image files recursively.
 - `scripts/score_folder.py` computes landmarks and face crops directly at inference time (no `metadata.csv` required).
 - `scripts/evaluate_confusion_matrix.py` expects class subfolders inside the provided split folder.
+
+
+# The Weights
+The Drive Link for the weights of our model : https://drive.google.com/file/d/13wgrwu5zkcUw1mfhcOEYTMbJyOPx8xsj/view?usp=sharing
