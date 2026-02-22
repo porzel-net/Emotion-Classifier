@@ -7,6 +7,13 @@ For our model architecture we chose a modified ResNet18 Model. Instead of the tr
 
 In addition, after the blocks we use a Global Average Pooling (GAP) instead of the traditional Flatten layer to reduce the total parameter count. Then we implemented a \( 6 \)-node fully connected layer with a softmax function to finish our model off.
 
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{media/Architecture-Structure.jpeg}
+    \caption{Pipeline overview of the classifier architecture. Starting from a \(64\times64\) input image, the model applies an initial \(3\times3\) convolution, four residual stages with stage-specific strides and feature-map dimensions, Global Average Pooling, and a final 6-node fully connected layer.}
+    \label{fig:architecture_pipeline}
+\end{figure}
+
 \paragraph{Optional internal branches of the central model}
 
 \textbf{Raw landmark fusion.}

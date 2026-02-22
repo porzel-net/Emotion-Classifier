@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14)  22 FEB 2026 17:23
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14)  22 FEB 2026 22:55
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -306,6 +306,14 @@ Package xcolor Info: Model `wave' substituted by `hsb' on input line 1372.
 )
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/graphics/dvipsnam.def
 File: dvipsnam.def 2016/06/17 v3.0m Driver-dependent file (DPC,SPQR)
+)
+(/usr/local/texlive/2025basic/texmf-dist/tex/latex/float/float.sty
+Package: float 2001/11/08 v1.3d Float enhancements (AL)
+\c@float@type=\count330
+\float@exts=\toks33
+\float@box=\box59
+\@float@everytoks=\toks34
+\@floatcapt=\box60
 ))
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/hyperref/hyperref.sty
 Package: hyperref 2025-07-12 v7.01o Hypertext links for LaTeX
@@ -343,15 +351,15 @@ Package: refcount 2019/12/15 v3.6 Data extraction from label references (HO)
 ing.sty
 Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
-\c@section@level=\count330
+\c@section@level=\count331
 )
 (/usr/local/texlive/2025basic/texmf-dist/tex/generic/stringenc/stringenc.sty
 Package: stringenc 2019/11/29 v1.12 Convert strings between diff. encodings (HO
 )
 )
 \@linkdim=\dimen190
-\Hy@linkcounter=\count331
-\Hy@pagecounter=\count332
+\Hy@linkcounter=\count332
+\Hy@pagecounter=\count333
 
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/hyperref/pd1enc.def
 File: pd1enc.def 2025-07-12 v7.01o Hyperref: PDFDocEncoding definition (HO)
@@ -361,7 +369,7 @@ Now handling font encoding PD1 ...
 (/usr/local/texlive/2025basic/texmf-dist/tex/generic/intcalc/intcalc.sty
 Package: intcalc 2019/12/15 v1.3 Expandable calculations with integers (HO)
 )
-\Hy@SavedSpaceFactor=\count333
+\Hy@SavedSpaceFactor=\count334
 
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/hyperref/puenc.def
 File: puenc.def 2025-07-12 v7.01o Hyperref: PDF Unicode definition (HO)
@@ -396,13 +404,13 @@ Package: bigintcalc 2019/12/15 v1.5 Expandable calculations on big integers (HO
 Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 2
 84.
 ))
-\c@Hy@tempcnt=\count334
+\c@Hy@tempcnt=\count335
 LaTeX Info: Redefining \url on input line 4801.
 \XeTeXLinkMargin=\dimen191
  (/usr/local/texlive/2025basic/texmf-dist/tex/generic/bitset/bitset.sty
 Package: bitset 2019/12/09 v1.3 Handle bit-vector datatype (HO)
 )
-\Fld@menulength=\count335
+\Fld@menulength=\count336
 \Field@Width=\dimen192
 \Fld@charsize=\dimen193
 Package hyperref Info: Hyper figures OFF on input line 6078.
@@ -412,16 +420,16 @@ Package hyperref Info: backreferencing ON on input line 6091.
 Package hyperref Info: Link coloring ON on input line 6096.
 Package hyperref Info: Link coloring with OCG OFF on input line 6103.
 Package hyperref Info: PDF/A mode OFF on input line 6108.
-\Hy@abspage=\count336
-\c@Item=\count337
-\c@Hfootnote=\count338
+\Hy@abspage=\count337
+\c@Item=\count338
+\c@Hfootnote=\count339
 )
 Package hyperref Info: Driver (autodetected): hpdftex.
 
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/hyperref/hpdftex.def
 File: hpdftex.def 2025-07-12 v7.01o Hyperref driver for pdfTeX
-\Fld@listcount=\count339
-\c@bookmark@seq@number=\count340
+\Fld@listcount=\count340
+\c@bookmark@seq@number=\count341
 \Hy@SectionHShift=\skip57
 )
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/cleveref/cleveref.sty
@@ -451,7 +459,7 @@ File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/l3backend/l3backend-pdftex.d
 ef
 File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count341
+\l__color_backend_stack_int=\count342
 ) (./main.aux)
 \openout1 = `main.aux'.
 
@@ -476,17 +484,17 @@ LaTeX Font Info:    ... okay on input line 32.
 
 (/usr/local/texlive/2025basic/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count342
+\scratchcounter=\count343
 \scratchdimen=\dimen194
-\scratchbox=\box59
-\nofMPsegments=\count343
-\nofMParguments=\count344
-\everyMPshowfont=\toks33
-\MPscratchCnt=\count345
+\scratchbox=\box61
+\nofMPsegments=\count344
+\nofMParguments=\count345
+\everyMPshowfont=\toks35
+\MPscratchCnt=\count346
 \MPscratchDim=\dimen195
-\MPnumerator=\count346
-\makeMPintoPDFobject=\count347
-\everyMPtoPDFconversion=\toks34
+\MPnumerator=\count347
+\makeMPintoPDFobject=\count348
+\everyMPtoPDFconversion=\toks36
 )
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.s
 ty
@@ -506,26 +514,27 @@ File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
 e
 ))
 Package caption Info: Begin \AtBeginDocument code.
+Package caption Info: float package is loaded.
 Package caption Info: hyperref package is loaded.
 Package caption Info: End \AtBeginDocument code.
  ABD: EveryShipout initializing macros
 (/usr/local/texlive/2025basic/texmf-dist/tex/latex/eepic/epic.sty
 Enhancements to Picture Environment. Version 1.2 - Released June 1, 1986
-\@@multicnt=\count348
-\d@lta=\count349
+\@@multicnt=\count349
+\d@lta=\count350
 \@delta=\dimen196
 \@@delta=\dimen197
-\@gridcnt=\count350
-\@joinkind=\count351
+\@gridcnt=\count351
+\@joinkind=\count352
 \@dotgap=\dimen198
 \@ddotgap=\dimen199
-\@x@diff=\count352
-\@y@diff=\count353
+\@x@diff=\count353
+\@y@diff=\count354
 \x@diff=\dimen256
 \y@diff=\dimen257
-\@dotbox=\box60
-\num@segments=\count354
-\num@segmentsi=\count355
+\@dotbox=\box62
+\num@segments=\count355
+\num@segmentsi=\count356
 \@datafile=\read2
 )
 Package backref Info: ** backref set up for natbib ** on input line 32.
@@ -613,14 +622,50 @@ mf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2025basic/texmf-d
 ist/fonts/enc/dvips/base/8r.enc}
 
 
-]) (./sec/experiments.tex) (./sec/results.tex
-[2]
-<media/Landmark-Detecter-Results.jpeg, id=91, 1606.0pt x 1148.29pt>
+]
+<media/Architecture-Structure.jpeg, id=80, 1606.0pt x 1450.41875pt>
+File: media/Architecture-Structure.jpeg Graphic file (type jpg)
+<use media/Architecture-Structure.jpeg>
+Package pdftex.def Info: media/Architecture-Structure.jpeg  used on input line 
+12.
+(pdftex.def)             Requested size: 237.13594pt x 214.14516pt.
+ [2 <./media/Architecture-Structure.jpeg>])
+(./sec/experiments.tex
+<media/Landmark-Detecter-Results.jpeg, id=95, 1606.0pt x 1148.29pt>
 File: media/Landmark-Detecter-Results.jpeg Graphic file (type jpg)
 <use media/Landmark-Detecter-Results.jpeg>
 Package pdftex.def Info: media/Landmark-Detecter-Results.jpeg  used on input li
-ne 15.
+ne 26.
 (pdftex.def)             Requested size: 237.13594pt x 169.53775pt.
+<media/Model-Performance-Comparison.jpeg, id=96, 1606.0pt x 949.5475pt>
+File: media/Model-Performance-Comparison.jpeg Graphic file (type jpg)
+<use media/Model-Performance-Comparison.jpeg>
+Package pdftex.def Info: media/Model-Performance-Comparison.jpeg  used on input
+ line 33.
+(pdftex.def)             Requested size: 237.13594pt x 140.19469pt.
+) (./sec/results.tex [3 <./media/Landmark-Detecter-Results.jpeg>]
+<media/Effect of Dropout on Generalization.jpeg, id=103, 1606.0pt x 974.64125pt
+>
+File: media/Effect of Dropout on Generalization.jpeg Graphic file (type jpg)
+<use media/Effect of Dropout on Generalization.jpeg>
+Package pdftex.def Info: media/Effect of Dropout on Generalization.jpeg  used o
+n input line 10.
+(pdftex.def)             Requested size: 237.13594pt x 143.89961pt.
+<media/Weight-Decay-Regularization-Effect.jpeg, id=104, 1606.0pt x 978.65625pt>
+
+File: media/Weight-Decay-Regularization-Effect.jpeg Graphic file (type jpg)
+<use media/Weight-Decay-Regularization-Effect.jpeg>
+Package pdftex.def Info: media/Weight-Decay-Regularization-Effect.jpeg  used on
+ input line 19.
+(pdftex.def)             Requested size: 237.13594pt x 144.4924pt.
+<media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg, id=105, 16
+06.0pt x 965.6075pt>
+File: media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg Graphi
+c file (type jpg)
+<use media/Performance-After-Custom-Transformation-(Optimal Setup).jpeg>
+Package pdftex.def Info: media/Performance-After-Custom-Transformation-(Optimal
+ Setup).jpeg  used on input line 30.
+(pdftex.def)             Requested size: 237.13594pt x 142.56584pt.
 ) (./sec/discussion_conclusion_outlook.tex
 Missing character: There is no f in font nullfont!
 Missing character: There is no a in font nullfont!
@@ -639,47 +684,48 @@ Missing character: There is no t in font nullfont!
 \tf@brf=\write4
 \openout4 = `main.brf'.
 
-) [3
+ [4 <./media/Effect of Dropout on Generalization.jpeg> <./media/Model-Performan
+ce-Comparison.jpeg> <./media/Weight-Decay-Regularization-Effect.jpeg> <./media/
+Performance-After-Custom-Transformation-(Optimal Setup).jpeg>]) [5
 
- <./media/Landmark-Detecter-Results.jpeg>]
-(./main.aux)
+] (./main.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-11-14>
  ***********
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: C9E0028C03C3DE9800C6A9F03F1C5170;3164.
-
-
-Package rerunfilecheck Warning: File `main.brf' has changed.
-(rerunfilecheck)                Rerun to get bibliographical references right.
-
-Package rerunfilecheck Info: Checksums for `main.brf':
-(rerunfilecheck)             Before: D41D8CD98F00B204E9800998ECF8427E;0
-(rerunfilecheck)             After:  701ECBBDE6DC395BEC691C5E492B171C;44.
+Package rerunfilecheck Info: File `main.brf' has not changed.
+(rerunfilecheck)             Checksum: 5742B1ED9D1CCE67A226CCFE111E0757;44.
  ) 
 Here is how much of TeX's memory you used:
- 15273 strings out of 469010
- 252616 string characters out of 5454854
- 716326 words of memory out of 5000000
- 43720 multiletter control sequences out of 15000+600000
- 649327 words of font info for 85 fonts, out of 8000000 for 9000
+ 15393 strings out of 469010
+ 255902 string characters out of 5454854
+ 718752 words of memory out of 5000000
+ 43825 multiletter control sequences out of 15000+600000
+ 650872 words of font info for 91 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 90i,9n,93p,410b,460s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 90i,9n,93p,885b,527s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmex1
 0.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/cm/c
 mmi10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfonts/
 cm/cmmi7.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/amsfon
-ts/cm/cmr10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/ams
-fonts/cm/cmr7.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/a
-msfonts/cm/cmsy10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/urw/
-times/utmb8a.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/urw/times
-/utmr8a.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/urw/times/utmr
-i8a.pfb>
-Output written on main.pdf (3 pages, 265842 bytes).
+ts/cm/cmmi9.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/ams
+fonts/cm/cmr10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/public/
+amsfonts/cm/cmr6.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/publi
+c/amsfonts/cm/cmr7.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/pub
+lic/amsfonts/cm/cmr9.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type1/p
+ublic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/typ
+e1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/
+type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025basic/texmf-dist/fon
+ts/type1/public/amsfonts/cm/cmsy9.pfb></usr/local/texlive/2025basic/texmf-dist/
+fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2025basic/texmf-dist/fonts
+/type1/urw/times/utmr8a.pfb></usr/local/texlive/2025basic/texmf-dist/fonts/type
+1/urw/times/utmri8a.pfb>
+Output written on main.pdf (5 pages, 1210627 bytes).
 PDF statistics:
- 148 PDF objects out of 1000 (max. 8388607)
- 122 compressed objects within 2 object streams
- 27 named destinations out of 1000 (max. 500000)
- 134 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 198 PDF objects out of 1000 (max. 8388607)
+ 153 compressed objects within 2 object streams
+ 34 named destinations out of 1000 (max. 500000)
+ 159 words of extra memory for PDF output out of 10000 (max. 10000000)
 

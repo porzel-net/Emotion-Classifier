@@ -2,15 +2,35 @@
 \label{sec:experiments}
 
 \textit{Metric focus.}
-For model training we decided to train our model over several epochs since the facial expressions cannot be learned reliably from a single pass over the data. After each batch the model parameters will be updated using backpropagation. Alongside the training rate, a validation split was used to get a better idea of how well the model generalises to unseen samples. This is especially important facial emotion recognition, where models tend to learn dataset specific patterns instead of expression related features which leads to overfitting. After each epoch, the training accuracy was calculated using our accuracy function alongside the training loss by comparing the predicted labels with the true labels.  
+Training was performed over multiple epochs, because facial-expression patterns were not learned reliably in a single pass through the data. Model parameters were updated after each batch via backpropagation. In addition, a validation split was used to estimate generalization to unseen samples, which is critical in facial emotion recognition because models can learn dataset-specific patterns instead of expression-related features and thereby overfit. After each epoch, training accuracy and training loss were computed by comparing predicted and true labels.
 
-The Adam optimiser was chosen as our main optimisation method, as it can adjust parameter updates automatically and is generally the most common choice in deep learning. The initial tests were conducted to figure out the most optimum learning rate for Adam, and the model was trained several different times over many epochs with different learning rates between \( 0.0003 \) and \( 0.003 \).
+Adam was selected as the primary optimizer due to its adaptive update mechanism and broad use in deep-learning practice. Initial tuning experiments evaluated learning rates between \(0.0003\) and \(0.003\), with repeated runs over multiple epochs.
 
-To limit overfitting, several regulations methods were applied. Our main method to limit overfitting was Dropout to prevent the model from relying too strongly on individual neurons. In addition, after witnessing overfitting in the our initial tests \( L_2 \) weight decay was applied to keep the model parameters from growing too large. 
+To reduce overfitting, two regularization strategies were applied: Dropout and \(L_2\) weight decay. Dropout was used to reduce reliance on individual neurons, and \(L_2\) weight decay was introduced after overfitting was observed in early tests.
 
-As well as the two regularization methods our model was tested with different epoch counts to figure out the sweet spot between underfitting and overfitting. Over \( 15 \) combinations between these three parameters were tested several times to find the average values for each combination, in order to figure out the parameter values that give the best test accuracy. The dropout rates between \( 0.1 \) and \( 0.5 \) were evaluated. To determine the best weight decay rate for \( L_2 \) regularization, tests were carried out between three different weight decay rates of \( 10^{-3} \), \( 10^{-4} \) and \( 10^{-5} \). 
+To identify a suitable trade-off between underfitting and overfitting, combinations of regularization settings and epoch counts were evaluated. More than \(15\) parameter combinations were tested repeatedly and averaged. Dropout rates in the range \(0.1\) to \(0.5\) were examined. For \(L_2\) regularization, weight decay values of \(10^{-3}\), \(10^{-4}\), and \(10^{-5}\) were compared.
 
-Different epoch counts were also tested as we witnessed that the initial approach of training our model for \( 10 \) epochs didn’t have the perfect training accuracy scores resulting in underfitting. Our parameters were tested with \( 20 \) and then \( 30 \) epochs as more than \( 30 \) epochs produced training accuracy rates of more than \( 99\% \) which indicates overfitting. As a final parameter the batch size was assessed as we tried out the different batch sizes of \( 64 \), \( 128 \) and \( 256 \).
-After implementing the custom transformation, we noticed that \( 30 \) epochs was not sufficient and that we needed more epochs to prevent underfitting. We also examined that the loss decreased slower after implementing our custom transformation but that it reached the same level after more epochs which was another reason behind training our model for more epochs. At this stage of testing we also implemented our evaluation functions to calculate the precision, recall and \( F_1 \)-score of our model.
+Epoch counts were also varied. An initial configuration of \(10\) epochs showed underfitting. Further tests were conducted at \(20\) and \(30\) epochs, while runs above \(30\) epochs reached training accuracies above \(99\%\), indicating overfitting. Batch size was additionally evaluated at \(64\), \(128\), and \(256\).
 
-Furthermore we implemented our landmark model, alongside our new dataset. Noticing the overfitting we decided to implement further functions to improve the test accuracy of our model. These functions include a Sobel feature branch which creates a separate CNN branch for edge information, and a width multiplier support to make experimentation with different image resolutions easier, which affects regularization implicitly.
+After introducing a custom transformation, \(30\) epochs were no longer sufficient, and additional epochs were required to avoid underfitting. Loss decreased more slowly with the custom transformation, but reached a comparable level after longer training, which motivated extending the epoch count. At this stage, evaluation functions for precision, recall, and \(F_1\)-score were also integrated.
+
+Furthermore, a landmark model and a new dataset were introduced. After renewed overfitting was observed, additional functions were implemented to improve test accuracy: a Sobel feature branch (separate CNN path for edge information) and width-multiplier support to simplify experiments with different image resolutions, which also influences regularization behavior implicitly.
+
+Figure~\ref{fig:landmark_detector_results} shows qualitative predictions of the self-trained landmark detector on 9 samples (3$\times$3 grid), including predicted outputs and labels.
+In this panel, landmark localization is visibly successful for most samples.
+Some samples are only moderately cropped or landmarked.
+For \textit{Sample 36}, the facial landmarks are not detected.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{media/Landmark-Detecter-Results.jpeg}
+    \caption{Qualitative landmark-detector results on 9 samples. Most faces show stable landmark localization, while \textit{Sample 36} shows a clear miss.}
+    \label{fig:landmark_detector_results}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{media/Model-Performance-Comparison.jpeg}
+    \caption{Model performance comparison between the initial architecture and the improved model. Test accuracy increases from \(72.24\%\) to \(76.75\%\).}
+    \label{fig:model_performance_comparison}
+\end{figure}
