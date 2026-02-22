@@ -33,11 +33,15 @@ What this does:
 - unzips automatically,
 - ensures stable folder names used by defaults in the scripts.
 
-Prepared folders in `data/`:
+Downloaded raw folders in `data/`:
 - `fer2013`
 - `cropped-face-keypoint-dataset-68-landmarks`
 - `soloface-detection-dataset`
 - `affectnet-yolo-format`
+
+Prepared dataset naming convention:
+- `fer2013-prepared`
+- `affectnet-yolo-format-prepared`
 
 ### Optional single-dataset calls
 
@@ -79,7 +83,7 @@ python -m prepare_data.prepare_fer2013 --device cpu
 | Parameter | Required | Default | Description |
 |---|---|---|---|
 | `--source` | No | `data/fer2013` | Input FER root (must contain `train/` and `test/`). |
-| `--target` | No | `data/emotion-classifier-dataset` | Output root for processed dataset and metadata. |
+| `--target` | No | `data/fer2013-prepared` | Output root for processed dataset and metadata. |
 | `--resize` | No | `48` | Output image size (`resize x resize`). |
 | `--device` | No | `cpu` | Device used by `face_alignment` (`cpu`, `mps`, `cuda`). |
 
@@ -103,7 +107,7 @@ python -m prepare_data.prepare_affectnet --device cpu
 | Parameter | Required | Default | Description |
 |---|---|---|---|
 | `--source` | No | `data/affectnet-yolo-format` | Input AffectNet root with split folders containing `images/` and `labels/`. |
-| `--target` | No | `data/affectnet-emotion-classifier-dataset` | Output root for FER-style train/test emotion folders and metadata. |
+| `--target` | No | `data/affectnet-yolo-format-prepared` | Output root for FER-style train/test emotion folders and metadata. |
 | `--resize` | No | `64` | Output image size (`resize x resize`). |
 | `--device` | No | `cpu` | Device used by `face_alignment` (`cpu`, `mps`, `cuda`). |
 | `--max-per-split` | No | unlimited | Optional sample cap per source split for quick tests. |
@@ -121,7 +125,7 @@ Purpose:
 Example:
 
 ```bash
-python -m scripts.score_folder ./data/emotion-classifier-dataset/test/happy/ \
+python -m scripts.score_folder ./data/fer2013-prepared/test/happy/ \
   --weights-dir models/emotion-classifier-best.pth \
   --device mps
 ```
@@ -140,7 +144,7 @@ python -m scripts.score_folder ./data/emotion-classifier-dataset/test/happy/ \
 | `--use-gnn` | No | `False` | Enables GNN processing over landmarks. |
 | `--gnn-hidden-dim` | No | `64` | GNN hidden dimension (must match training). |
 | `--gnn-steps` | No | `2` | Number of GNN message-passing steps. |
-| `--metadata-file` | No | `data/emotion-classifier-dataset/metadata.csv` | Landmark CSV used when `--use-landmarks` is enabled. |
+| `--metadata-file` | No | `data/fer2013-prepared/metadata.csv` | Landmark CSV used when `--use-landmarks` is enabled. |
 | `--metadata-root` | No | `.` | Root path for resolving metadata image paths. |
 
 ## 6. Live Webcam/Video Prediction with explainable AI
@@ -240,7 +244,71 @@ python -m train.train_cropping \
 | `--undersample-boundary-rate` | No | `0.0` | Fraction of near-boundary samples to drop. |
 | `--disable-reduce-lr` | No | `False` | Disables `ReduceLROnPlateau` callback. |
 
-## 8. K-Means Baseline Evaluation
+## 8. Train Emotion Classifier
+
+Script: `train/train_emotion_classifier.py`
+
+Purpose:
+- trains the lightweight Neconet-style emotion classifier,
+- supports multiple preprocessing filters and augmentation switches,
+- supports optional landmark, GNN, and Sobel side branches,
+- writes best checkpoint to `models/emotion-classifier-best.pth`.
+
+Example:
+
+```bash
+python -m train.train_emotion_classifier \
+  --data-root data/fer2013-prepared \
+  --epochs 40 \
+  --batch-size 128 \
+  --filter sobel \
+  --sampling original \
+  --use-landmarks \
+  --use-gnn \
+  --gnn-hidden-dim 64 \
+  --gnn-steps 2 \
+  --device mps
+```
+
+### Parameters
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `--data-root` | No | `data/fer2013-prepared` | Training dataset root. |
+| `--val-data-root` | No | disabled | Optional separate dataset root used only for validation. |
+| `--val-data-split` | No | `test` | Split name inside `--val-data-root` for validation. |
+| `--epochs` | No | `40` | Number of training epochs. |
+| `--batch-size` | No | `128` | Batch size. |
+| `--lr` | No | `1e-3` | Learning rate. |
+| `--weight-decay` | No | `1e-4` | Weight decay. |
+| `--scheduler` | No | `cosine` | LR scheduler: `cosine` or `plateau`. |
+| `--plateau-factor` | No | `0.5` | Factor for `ReduceLROnPlateau`. |
+| `--plateau-patience` | No | `2` | Patience for `ReduceLROnPlateau`. |
+| `--plateau-min-lr` | No | `1e-6` | Minimum LR for `ReduceLROnPlateau`. |
+| `--sampling` | No | `original` | Sampling mode: `original`, `undersample`, `loss-weight`. |
+| `--filter` | No | `sobel` | Input filter: `sobel`, `roberts`, `laplacian`, `none`. |
+| `--augment-rotation` | No | `False` | Enable rotation augmentation. |
+| `--augment-scale` | No | `False` | Enable random resized crop augmentation. |
+| `--augment-translation` | No | `False` | Enable translation augmentation. |
+| `--augment-perspective` | No | `False` | Enable perspective/shear augmentation. |
+| `--augment-erasing` | No | `False` | Enable RandomErasing on tensor images. |
+| `--augment-noise` | No | `False` | Enable Gaussian noise augmentation. |
+| `--noise-std` | No | `0.02` | Gaussian noise std when `--augment-noise` is active. |
+| `--val-split` | No | `0.1` | Validation fraction when no separate validation root is used. |
+| `--loss` | No | `ce` | Loss function: `ce` or `mse`. |
+| `--use-landmarks` | No | `False` | Enable landmark-aware training. |
+| `--use-gnn` | No | `False` | Enable landmark GNN branch (requires landmarks). |
+| `--gnn-hidden-dim` | No | `64` | Hidden dimension of landmark GNN branch. |
+| `--gnn-steps` | No | `2` | Message-passing steps for GNN branch. |
+| `--use-sobel-branch` | No | `False` | Enable extra Sobel feature branch. |
+| `--sobel-branch-dim` | No | `32` | Feature size for Sobel branch. |
+| `--metadata-file` | No | `data/fer2013-prepared/metadata.csv` | Landmark metadata CSV for training root. |
+| `--val-metadata-file` | No | auto | Landmark metadata CSV for validation root (defaults to `<val-data-root>/metadata.csv`). |
+| `--device` | No | auto | Torch device override (`cpu`, `mps`, `cuda`). |
+| `--width-multiplier` | No | `1.0` | Width scaling for model channels. |
+| `--dropout` | No | `0.35` | Dropout before classifier head. |
+
+## 9. K-Means Baseline Evaluation
 
 Script: `train/train_kmeans_baseline.py`
 
@@ -270,7 +338,7 @@ python -m train.train_kmeans_baseline \
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `--data-root` | No | `data/emotion-classifier-dataset` | Dataset root containing `train/` and `test/`. |
+| `--data-root` | No | `data/fer2013-prepared` | Dataset root containing `train/` and `test/`. |
 | `--filter` | No | `sobel` | Preprocessing filter (`sobel`, `roberts`, `laplacian`, `none`). |
 | `--k` | No | number of classes (6) | Number of clusters. |
 | `--max-iter` | No | `100` | Max iterations per run. |
@@ -288,11 +356,11 @@ python -m train.train_kmeans_baseline \
 | `--pca-components` | No | `128` | PCA output dimension (if PCA enabled). |
 | `--no-optimal-assignment` | No | `False` | Disable optimal cluster-to-class mapping. |
 | `--use-landmark-fusion` | No | `False` | Concatenate landmark vectors from metadata. |
-| `--metadata-file` | No | `data/emotion-classifier-dataset/metadata.csv` | Landmark metadata CSV. |
+| `--metadata-file` | No | `data/fer2013-prepared/metadata.csv` | Landmark metadata CSV. |
 | `--landmark-weight` | No | `1.0` | Scaling factor for landmark feature block. |
 | `--report-json` | No | disabled | Optional path for JSON report output. |
 
-## 9. Train a Custom Landmark Detector
+## 10. Train a Custom Landmark Detector
 
 Script: `train/train_landmarks_detector.py`
 
@@ -347,7 +415,7 @@ python -m train.train_landmarks_detector \
 | `--reduce-lr-patience` | No | `3` | Plateau patience (epochs). |
 | `--reduce-lr-min-lr` | No | `1e-6` | Minimum LR under plateau scheduler. |
 
-## 10. Notes
+## 11. Notes
 
 - `visualize/predict_emotion.py` requires either `--webcam` or `--video`.
 - `scripts/score_folder.py` expects a folder (not recursive).

@@ -239,7 +239,7 @@ def parse_args():
     parser.add_argument(
         "--target",
         type=Path,
-        default=Path("data/emotion-classifier-dataset"),
+        default=Path("data/fer2013-prepared"),
         help="Destination root for the processed dataset",
     )
     parser.add_argument(

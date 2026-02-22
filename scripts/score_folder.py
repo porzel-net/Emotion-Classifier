@@ -28,7 +28,7 @@ LOGGER = logging.getLogger(__name__)
 CSV_COLUMNS = ["filepath", "happiness", "surprise", "sadness", "anger", "disgust", "fear"]
 CSV_ORDER = ["Happiness", "Surprise", "Sadness", "Anger", "Disgust", "Fear"]
 CLASS_ORDER = ["angry", "disgusted", "fearful", "happy", "sad", "surprised"]
-DEFAULT_METADATA = Path("data/emotion-classifier-dataset/metadata.csv")
+DEFAULT_METADATA = Path("data/fer2013-prepared/metadata.csv")
 DEFAULT_MODEL_WEIGHTS = Path("models/emotion-classifier-best.pth")
 
 FILTER_TRANSFORMS = {

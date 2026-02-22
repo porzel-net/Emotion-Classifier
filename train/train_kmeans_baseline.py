@@ -29,7 +29,7 @@ from helpers.neconet_helpers import (
 RANDOM_SEED = 1
 IMAGE_SIZE = 64
 DEFAULT_K = len(CLASS_ORDER)
-DEFAULT_ROOT = Path("data/emotion-classifier-dataset")
+DEFAULT_ROOT = Path("data/fer2013-prepared")
 DEFAULT_METADATA = DEFAULT_ROOT / "metadata.csv"
 
 FILTER_TRANSFORMS = {
@@ -404,7 +404,7 @@ def macro_f1(y_true: np.ndarray, y_pred: np.ndarray, num_classes: int) -> float:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="K-Means-only emotion clustering baseline.")
-    parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="Path to emotion-classifier-dataset")
+    parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="Path to prepared emotion dataset root")
     parser.add_argument(
         "--filter",
         choices=list(FILTER_TRANSFORMS.keys()),

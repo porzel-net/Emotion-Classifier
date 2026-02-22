@@ -15,6 +15,8 @@ Usage: sh data/download_datasets.sh [options]
 Downloads and unzips project datasets into data/ with stable folder names.
 Existing downloads/extractions are skipped by default.
 
+Prepared datasets use the naming convention: <raw-name>-prepared.
+
 Options:
   --dataset <name>      Download only one dataset.
                         Allowed: fer2013, landmarks68, soloface, affectnet
@@ -36,7 +38,7 @@ dataset_config() {
   dataset="$1"
   case "$dataset" in
     fer2013)
-      echo "FER-2013|fer2013.zip|https://www.kaggle.com/api/v1/datasets/download/msambare/fer2013|fer2013|fer2013|train,test|emotion-detection-fer"
+      echo "FER-2013|fer2013.zip|https://www.kaggle.com/api/v1/datasets/download/msambare/fer2013|fer2013|fer2013|train,test,!metadata.csv|emotion-detection-fer"
       ;;
     landmarks68)
       echo "68-landmark keypoint dataset|cropped-face-keypoint-dataset-68-landmarks.zip|https://www.kaggle.com/api/v1/datasets/download/sovitrath/cropped-face-keypoint-dataset-68-landmarks|cropped-face-keypoint-dataset-68-landmarks|cropped-face-keypoint-dataset-68-landmarks|training.csv,test.csv|"
@@ -45,7 +47,7 @@ dataset_config() {
       echo "SoloFace detection dataset|soloface-detection-dataset.zip|https://zenodo.org/records/14474899/files/soloface-detection-dataset.zip?download=1|soloface-detection-dataset|soloface-detection-dataset|train/images,test/images,val/images|"
       ;;
     affectnet)
-      echo "AffectNet YOLO format|affectnet-yolo-format.zip|https://www.kaggle.com/api/v1/datasets/download/fatihkgg/affectnet-yolo-format|affectnet-yolo-format|affectnet-yolo-format||"
+      echo "AffectNet YOLO format|affectnet-yolo-format.zip|https://www.kaggle.com/api/v1/datasets/download/fatihkgg/affectnet-yolo-format|affectnet-yolo-format|affectnet-yolo-format|train/images,train/labels,valid/images,valid/labels,test/images,test/labels,!metadata.csv|"
       ;;
     *)
       echo "ERROR: Unknown dataset '$dataset'." >&2
@@ -77,13 +79,33 @@ is_dataset_ready() {
   old_ifs="$IFS"
   IFS=','
   for marker in $markers_csv; do
-    if [ ! -e "$target_dir/$marker" ]; then
-      IFS="$old_ifs"
-      return 1
-    fi
+    case "$marker" in
+      !*)
+        neg_marker="${marker#!}"
+        if [ -e "$target_dir/$neg_marker" ]; then
+          IFS="$old_ifs"
+          return 1
+        fi
+        ;;
+      *)
+        if [ ! -e "$target_dir/$marker" ]; then
+          IFS="$old_ifs"
+          return 1
+        fi
+        ;;
+    esac
   done
   IFS="$old_ifs"
 
+  return 0
+}
+
+is_prepared_dataset() {
+  dataset_dir="$1"
+  [ -d "$dataset_dir" ] || return 1
+  [ -f "$dataset_dir/metadata.csv" ] || return 1
+  [ -d "$dataset_dir/train" ] || return 1
+  [ -d "$dataset_dir/test" ] || return 1
   return 0
 }
 
@@ -111,8 +133,45 @@ migrate_legacy_target_if_needed() {
     return 0
   fi
 
+  mkdir -p "$target_path"
   cp -a "$legacy_path"/. "$target_path"/
   echo "[$label] merged legacy folder into: $target_path"
+}
+
+migrate_prepared_target_if_needed() {
+  label="$1"
+  raw_path="$2"
+  prepared_path="$3"
+
+  if ! is_prepared_dataset "$raw_path"; then
+    return 0
+  fi
+
+  if [ ! -e "$prepared_path" ]; then
+    mv "$raw_path" "$prepared_path"
+    echo "[$label] moved prepared dataset from $raw_path to $prepared_path"
+    return 0
+  fi
+
+  mkdir -p "$prepared_path"
+  cp -a "$raw_path"/. "$prepared_path"/
+  rm -rf "$raw_path"
+  echo "[$label] merged prepared dataset from $raw_path into $prepared_path"
+}
+
+resolve_prepared_paths() {
+  dataset="$1"
+  case "$dataset" in
+    fer2013)
+      echo "fer2013-prepared|emotion-classifier-dataset"
+      ;;
+    affectnet)
+      echo "affectnet-yolo-format-prepared|affectnet-emotion-classifier-dataset"
+      ;;
+    *)
+      echo "|"
+      ;;
+  esac
 }
 
 download_zip_if_needed() {
@@ -240,25 +299,41 @@ echo "Data directory: $DATA_DIR"
 for dataset in $DATASETS; do
   cfg=$(dataset_config "$dataset")
 
-  label=$(echo "$cfg" | cut -d '|' -f1)
-  zip_name=$(echo "$cfg" | cut -d '|' -f2)
-  url=$(echo "$cfg" | cut -d '|' -f3)
-  target_name=$(echo "$cfg" | cut -d '|' -f4)
-  source_hint=$(echo "$cfg" | cut -d '|' -f5)
-  markers_csv=$(echo "$cfg" | cut -d '|' -f6)
+  dataset_label=$(echo "$cfg" | cut -d '|' -f1)
+  dataset_zip_name=$(echo "$cfg" | cut -d '|' -f2)
+  dataset_url=$(echo "$cfg" | cut -d '|' -f3)
+  raw_target_name=$(echo "$cfg" | cut -d '|' -f4)
+  raw_source_hint=$(echo "$cfg" | cut -d '|' -f5)
+  raw_markers_csv=$(echo "$cfg" | cut -d '|' -f6)
   legacy_name=$(echo "$cfg" | cut -d '|' -f7)
 
-  zip_path="$DATA_DIR/$zip_name"
-  target_path="$DATA_DIR/$target_name"
+  dataset_zip_path="$DATA_DIR/$dataset_zip_name"
+  raw_target_path="$DATA_DIR/$raw_target_name"
 
   legacy_path=""
   if [ -n "$legacy_name" ]; then
     legacy_path="$DATA_DIR/$legacy_name"
   fi
 
-  migrate_legacy_target_if_needed "$label" "$target_path" "$legacy_path" "$markers_csv"
-  download_zip_if_needed "$label" "$url" "$zip_path" "$target_path" "$markers_csv"
-  unzip_if_needed "$label" "$zip_path" "$target_path" "$source_hint" "$markers_csv"
+  migrate_legacy_target_if_needed "$dataset_label" "$raw_target_path" "$legacy_path" "$raw_markers_csv"
+
+  prepared_cfg=$(resolve_prepared_paths "$dataset")
+  prepared_name=$(echo "$prepared_cfg" | cut -d '|' -f1)
+  prepared_legacy_name=$(echo "$prepared_cfg" | cut -d '|' -f2)
+
+  if [ -n "$prepared_name" ]; then
+    prepared_path="$DATA_DIR/$prepared_name"
+    prepared_legacy_path=""
+    if [ -n "$prepared_legacy_name" ]; then
+      prepared_legacy_path="$DATA_DIR/$prepared_legacy_name"
+    fi
+
+    migrate_legacy_target_if_needed "$dataset_label prepared" "$prepared_path" "$prepared_legacy_path" "metadata.csv,train,test"
+    migrate_prepared_target_if_needed "$dataset_label" "$raw_target_path" "$prepared_path"
+  fi
+
+  download_zip_if_needed "$dataset_label" "$dataset_url" "$dataset_zip_path" "$raw_target_path" "$raw_markers_csv"
+  unzip_if_needed "$dataset_label" "$dataset_zip_path" "$raw_target_path" "$raw_source_hint" "$raw_markers_csv"
 done
 
 echo "All requested datasets are ready."

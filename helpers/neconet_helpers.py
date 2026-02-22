@@ -29,7 +29,7 @@ IMAGE_SIZE = 64
 NORMALIZE_MEAN = (0.5,)
 NORMALIZE_STD = (0.5,)
 DEFAULT_WEIGHTS = Path("models/Neconet_Weights3.pth")
-DEFAULT_DATASET_ROOT = Path("data/emotion-classifier-dataset")
+DEFAULT_DATASET_ROOT = Path("data/fer2013-prepared")
 
 Record = Tuple[str, int, int, float]
 

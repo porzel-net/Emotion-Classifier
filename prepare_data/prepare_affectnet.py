@@ -368,7 +368,7 @@ def parse_args():
     parser.add_argument(
         "--target",
         type=Path,
-        default=Path("data/affectnet-emotion-classifier-dataset"),
+        default=Path("data/affectnet-yolo-format-prepared"),
         help="Output root with FER-style train/test emotion folders and metadata.csv",
     )
     parser.add_argument(

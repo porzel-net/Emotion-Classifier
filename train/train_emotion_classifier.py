@@ -42,7 +42,7 @@ NUM_EPOCHS = 40
 IMAGE_SIZE = 64
 NUM_CLASSES = len(CLASS_ORDER)
 DEFAULT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
-DEFAULT_ROOT = Path("data/emotion-classifier-dataset")
+DEFAULT_ROOT = Path("data/fer2013-prepared")
 DEFAULT_METADATA = DEFAULT_ROOT / "metadata.csv"
 MODEL_DIR = Path("models")
 BEST_CHECKPOINT = MODEL_DIR / "emotion-classifier-best.pth"
@@ -1078,7 +1078,7 @@ def log_model_summary(model: nn.Module) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train and evaluate the lightweight Neconet ResNet variants.")
-    parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="Path to emotion-classifier-dataset")
+    parser.add_argument("--data-root", type=Path, default=DEFAULT_ROOT, help="Path to prepared emotion dataset root")
     parser.add_argument(
         "--val-data-root",
         type=Path,
