@@ -3,8 +3,9 @@
 
 \subsection{A) Central emotion-classification model}
 
-The central classifier is a lightweight ResNet-style architecture for grayscale $64\times64$ inputs.
-Key elements are a $3\times3$ stride-1 stem (Conv + BatchNorm + SiLU), four residual stages, adaptive average pooling, dropout, and a linear 6-class output.
+For our model architecture we chose a modified ResNet18 Model. Instead of the traditional \( 224 \times 224 \) image resolution our model accepts \( 64 \times 64 \) images and to accommodate for that we made several architectural modifications. One of the main modifications was changing the initial convolution layer, as we replaced ResNet18's \( 7 \times 7 \) kernel with a \( 3 \times 3 \) one to ensure that we do not lose critical information given the lower resolution input. The network then consists of \( 4 \) layers with each \( 2 \) blocks implementing residual stages. Each of the blocks use batch normalization followed by SiLU instead of ResNet's classic ReLU, as the Swish activation function offers smoother gradients and slightly better optimization in deeper networks. 
+
+In addition, after the blocks we use a Global Average Pooling (GAP) instead of the traditional Flatten layer to reduce the total parameter count. Then we implemented a \( 6 \)-node fully connected layer with a softmax function to finish our model off.
 
 \paragraph{Optional internal branches of the central model}
 
