@@ -475,7 +475,7 @@ def parse_args() -> argparse.Namespace:
         "--metadata-file",
         type=Path,
         default=DEFAULT_METADATA,
-        help="CSV containing normalized landmarks (same format as prepare_data/prepare-fer2013.py).",
+        help="CSV containing normalized landmarks (same format as prepare_data/prepare_fer2013.py).",
     )
     parser.add_argument(
         "--landmark-weight",
