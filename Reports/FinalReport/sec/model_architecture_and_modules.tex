@@ -3,7 +3,7 @@
 
 \subsection{A) Central emotion-classification model}
 
-For our model architecture we chose a modified ResNet18 Model. Instead of the traditional \( 224 \times 224 \) image resolution our model accepts \( 64 \times 64 \) images and to accommodate for that we made several architectural modifications. One of the main modifications was changing the initial convolution layer, as we replaced ResNet18's \( 7 \times 7 \) kernel with a \( 3 \times 3 \) one to ensure that we do not lose critical information given the lower resolution input. The network then consists of \( 4 \) layers with each \( 2 \) blocks implementing residual stages. Each of the blocks use batch normalization followed by SiLU instead of ResNet's classic ReLU, as the Swish activation function offers smoother gradients and slightly better optimization in deeper networks. 
+For our model architecture we chose a modified ResNet18 Model \cite{he2016resnet}. Instead of the traditional \( 224 \times 224 \) image resolution our model accepts \( 64 \times 64 \) images and to accommodate for that we made several architectural modifications. One of the main modifications was changing the initial convolution layer, as we replaced ResNet18's \( 7 \times 7 \) kernel with a \( 3 \times 3 \) one to ensure that we do not lose critical information given the lower resolution input. The network then consists of \( 4 \) layers with each \( 2 \) blocks implementing residual stages. Each of the blocks use batch normalization followed by SiLU instead of ResNet's classic ReLU, as the Swish/SiLU family offers smoother gradients and often improved optimization behavior in deeper networks \cite{ramachandran2017searching}. 
 
 In addition, after the blocks we use a Global Average Pooling (GAP) instead of the traditional Flatten layer to reduce the total parameter count. Then we implemented a \( 6 \)-node fully connected layer with a softmax function to finish our model off.
 
@@ -20,7 +20,7 @@ In addition, after the blocks we use a Global Average Pooling (GAP) instead of t
 Motivation: inject explicit facial geometry with minimal parameter overhead.
 Technical description: for a batch size \(B\), landmarks are represented as \(L\in\mathbb{R}^{B\times 2N}\) and concatenated directly with pooled backbone features \(z_{\text{cnn}}\in\mathbb{R}^{B\times C}\), where \(C\) is the width-multiplied final channel dimension.
 No intermediate MLP is applied to \(L\), so coordinate precision is preserved and branch latency remains negligible.
-Integration: late fusion at head input, \(z=[z_{\text{cnn}};L]\).
+Integration: late fusion at head input, \(z=[z_{\text{cnn}};L]\), following the idea of explicit geometric supervision through landmarks \cite{bulat2017far}.
 
 \textbf{Multi-view heatmap branch.}
 Motivation: represent landmark information at multiple spatial scales.
@@ -29,7 +29,7 @@ Technical description: landmarks are reshaped to point sets \((x_i,y_i)\), clamp
 H_k(x,y)=\sum_{i=1}^{N}\exp\left(-\frac{(x-x_i)^2+(y-y_i)^2}{2\sigma_k^2+\epsilon}\right).
 \]
 The stacked tensor \(H\in\mathbb{R}^{B\times 3\times 64\times 64}\) is processed by a compact Conv-BN-SiLU encoder and global average pooling to produce a dense branch embedding \(z_{\text{hm}}\in\mathbb{R}^{B\times d_{\text{hm}}}\).
-Integration: \(z_{\text{hm}}\) is concatenated into the classifier head vector.
+Integration: \(z_{\text{hm}}\) is concatenated into the classifier head vector, consistent with heatmap-based keypoint representations \cite{newell2016stacked}.
 
 \textbf{Landmark-guided attention.}
 Motivation: amplify expression-relevant regions before deep feature extraction.
@@ -39,7 +39,7 @@ Input modulation is performed as
 \tilde{I}(x,y)=I(x,y)\cdot(1+A(x,y)).
 \]
 In parallel, an auxiliary feature path applies Conv-BN-SiLU-\(1\times1\) Conv and adaptive pooling on \(F\), yielding \(z_{\text{att}}\in\mathbb{R}^{B\times d_{\text{att}}}\) (\(d_{\text{att}}=32\) in the current setup).
-Integration: \(\tilde{I}\) replaces the original image in the backbone stream; \(z_{\text{att}}\) is appended at head fusion.
+Integration: \(\tilde{I}\) replaces the original image in the backbone stream; \(z_{\text{att}}\) is appended at head fusion, analogous to lightweight channel-spatial attention designs \cite{woo2018cbam}.
 
 \textbf{Sobel feature branch.}
 Motivation: preserve high-frequency edge structure as a complementary cue.
@@ -48,14 +48,14 @@ Technical description: normalized grayscale input \(I\in[-1,1]\) is remapped to 
 M=\sqrt{G_x^2+G_y^2+\epsilon}.
 \]
 \(M\) is then normalized per sample by \(\max_{x,y} M(x,y)\) for contrast-invariant scaling and encoded by a dedicated Conv-BN-SiLU branch with global pooling, producing \(z_{\text{sobel}}\in\mathbb{R}^{B\times d_{\text{sobel}}}\).
-Integration: \(z_{\text{sobel}}\) is fused by concatenation at the classifier head.
+Integration: \(z_{\text{sobel}}\) is fused by concatenation at the classifier head \cite{sobel1968isotropic}.
 
 \textbf{Landmark GNN branch.}
 Motivation: capture relational geometry between landmarks, not only absolute coordinates.
 Technical description: landmarks are interpreted as \(N\) nodes with 2D features, \(V\in\mathbb{R}^{B\times N\times 2}\). Node states are initialized by linear projection \(h_i^{(0)}=W_p v_i\).
 For each message-passing step \(t\): \(m_i^{(t)}=\phi(W_m h_i^{(t)})\), global context \(g^{(t)}=\frac{1}{N}\sum_i m_i^{(t)}\), update \(h_i^{(t+1)}=\phi\!\left(W_u[h_i^{(t)};g^{(t)}]\right)\), with \(\phi=\mathrm{SiLU}\).
 After \(T\) steps (\(T=2\) by default), node states are pooled to \(z_{\text{gnn}}\in\mathbb{R}^{B\times d_{\text{gnn}}}\) (\(d_{\text{gnn}}=64\) default).
-Integration: \(z_{\text{gnn}}\) is concatenated with backbone and other branch embeddings.
+Integration: \(z_{\text{gnn}}\) is concatenated with backbone and other branch embeddings, following message-passing and graph-convolution principles \cite{gilmer2017neural,kipf2017semi}.
 
 \textbf{Dynamic head fusion.}
 Motivation: enable strict ablations while keeping one unified model definition.

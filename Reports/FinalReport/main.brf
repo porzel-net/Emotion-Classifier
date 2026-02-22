@@ -1,1 +1,14 @@
+\backcite {bulat2017far}{{1}{2.1}{section*.2}}
+\backcite {sobel1968isotropic}{{1}{2.1}{section*.3}}
+\backcite {buslaev2020albumentations}{{1}{2.2}{subsection.2.2}}
+\backcite {shorten2019augmentation}{{1}{2.2}{subsection.2.2}}
+\backcite {fernando2021dwb}{{1}{2.3}{subsection.2.3}}
+\backcite {he2016resnet}{{2}{3.1}{subsection.3.1}}
+\backcite {ramachandran2017searching}{{2}{3.1}{subsection.3.1}}
+\backcite {bulat2017far}{{2}{3.1}{section*.5}}
+\backcite {newell2016stacked}{{2}{3.1}{section*.5}}
+\backcite {woo2018cbam}{{2}{3.1}{section*.5}}
+\backcite {sobel1968isotropic}{{2}{3.1}{section*.5}}
+\backcite {gilmer2017neural}{{3}{3.1}{section*.5}}
+\backcite {kipf2017semi}{{3}{3.1}{section*.5}}
 \backcite {bulat2017far}{{5}{6}{section.6}}

@@ -2,6 +2,12 @@
 \providecommand\hyper@newdestlabel[2]{}
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{bulat2017far}
+\citation{sobel1968isotropic}
+\citation{shorten2019augmentation,buslaev2020albumentations}
+\citation{fernando2021dwb}
+\citation{he2016resnet}
+\citation{ramachandran2017searching}
 \@LN@col{1}
 \@writefile{toc}{\contentsline {section}{\numberline {1}\hskip -1em.~Introduction}{1}{section.1}\protected@file@percent }
 \newlabel{sec:intro}{{1}{1}{\hskip -1em.~Introduction}{section.1}{}}
@@ -16,9 +22,19 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}\hskip -1em.~Data preparation pipeline}{1}{subsection.2.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{1) Combined FER2013 and AffectNet-8 training setup}{1}{section*.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{2) Landmark metadata generation}{1}{section*.2}\protected@file@percent }
+\@writefile{brf}{\backcite{bulat2017far}{{1}{2.1}{section*.2}}}
 \@writefile{toc}{\contentsline {paragraph}{3) Signal shaping}{1}{section*.3}\protected@file@percent }
+\@writefile{brf}{\backcite{sobel1968isotropic}{{1}{2.1}{section*.3}}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}\hskip -1em.~Geometry-consistent augmentation}{1}{subsection.2.2}\protected@file@percent }
+\@writefile{brf}{\backcite{buslaev2020albumentations}{{1}{2.2}{subsection.2.2}}}
+\@writefile{brf}{\backcite{shorten2019augmentation}{{1}{2.2}{subsection.2.2}}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3}\hskip -1em.~Imbalance-aware optimization}{1}{subsection.2.3}\protected@file@percent }
+\@writefile{brf}{\backcite{fernando2021dwb}{{1}{2.3}{subsection.2.3}}}
+\citation{bulat2017far}
+\citation{newell2016stacked}
+\citation{woo2018cbam}
+\citation{sobel1968isotropic}
+\citation{gilmer2017neural,kipf2017semi}
 \@LN@col{1}
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Pipeline overview of the classifier architecture. Starting from a \(64\times 64\) input image, the model applies an initial \(3\times 3\) convolution, four residual stages with stage-specific strides and feature-map dimensions, Global Average Pooling, and a final 6-node fully connected layer.}}{2}{figure.caption.4}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
@@ -28,9 +44,17 @@
 \newlabel{sec:architecture}{{3}{2}{\hskip -1em.~Model Architecture and Module Boundaries}{section.3}{}}
 \newlabel{sec:architecture@cref}{{[section][3][]3}{[1][1][]2}{}{}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}\hskip -1em.~A) Central emotion-classification model}{2}{subsection.3.1}\protected@file@percent }
+\@writefile{brf}{\backcite{he2016resnet}{{2}{3.1}{subsection.3.1}}}
+\@writefile{brf}{\backcite{ramachandran2017searching}{{2}{3.1}{subsection.3.1}}}
 \@writefile{toc}{\contentsline {paragraph}{Optional internal branches of the central model}{2}{section*.5}\protected@file@percent }
 \@LN@col{2}
+\@writefile{brf}{\backcite{bulat2017far}{{2}{3.1}{section*.5}}}
+\@writefile{brf}{\backcite{newell2016stacked}{{2}{3.1}{section*.5}}}
+\@writefile{brf}{\backcite{woo2018cbam}{{2}{3.1}{section*.5}}}
+\@writefile{brf}{\backcite{sobel1968isotropic}{{2}{3.1}{section*.5}}}
 \@LN@col{1}
+\@writefile{brf}{\backcite{gilmer2017neural}{{3}{3.1}{section*.5}}}
+\@writefile{brf}{\backcite{kipf2017semi}{{3}{3.1}{section*.5}}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}\hskip -1em.~B) Separate landmark-detector module}{3}{subsection.3.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}\hskip -1em.~C) Separate face-cropper module}{3}{subsection.3.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}\hskip -1em.~D) Separate K-Means module (creative first idea)}{3}{subsection.3.4}\protected@file@percent }
@@ -71,6 +95,16 @@
 \bibstyle{ieeenat_fullname}
 \bibdata{main}
 \bibcite{bulat2017far}{{1}{2017}{{Bulat and Tzimiropoulos}}{{}}}
+\bibcite{buslaev2020albumentations}{{2}{2020}{{Buslaev et~al.}}{{Buslaev, Iglovikov, Khvedchenya, Parinov, Druzhinin, and Kalinin}}}
+\bibcite{fernando2021dwb}{{3}{2021}{{Fernando and Tsokos}}{{}}}
+\bibcite{gilmer2017neural}{{4}{2017}{{Gilmer et~al.}}{{Gilmer, Schoenholz, Riley, Vinyals, and Dahl}}}
+\bibcite{he2016resnet}{{5}{2016}{{He et~al.}}{{He, Zhang, Ren, and Sun}}}
+\bibcite{kipf2017semi}{{6}{2017}{{Kipf and Welling}}{{}}}
+\bibcite{newell2016stacked}{{7}{2016}{{Newell et~al.}}{{Newell, Yang, and Deng}}}
+\bibcite{ramachandran2017searching}{{8}{2017}{{Ramachandran et~al.}}{{Ramachandran, Zoph, and Le}}}
+\bibcite{shorten2019augmentation}{{9}{2019}{{Shorten and Khoshgoftaar}}{{}}}
+\bibcite{sobel1968isotropic}{{10}{1968}{{Sobel and Feldman}}{{}}}
+\bibcite{woo2018cbam}{{11}{2018}{{Woo et~al.}}{{Woo, Park, Lee, and Kweon}}}
 \@LN@col{1}
 \@LN@col{2}
 \gdef \@abspage@last{6}
