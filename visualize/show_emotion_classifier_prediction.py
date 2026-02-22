@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Button
 
 from helpers.neconet_helpers import (
     DEFAULT_DATASET_ROOT,
@@ -52,6 +53,13 @@ class SimpleBrowser:
         self.fig, axes = plt.subplots(3, 3, figsize=(6, 6))
         self.axes = axes.flatten()
         self.status = self.fig.text(0.5, 0.95, "", ha="center", va="center")
+        self.fig.subplots_adjust(bottom=0.12)
+        prev_ax = self.fig.add_axes([0.30, 0.02, 0.15, 0.06])
+        next_ax = self.fig.add_axes([0.55, 0.02, 0.15, 0.06])
+        self.prev_button = Button(prev_ax, "Prev")
+        self.next_button = Button(next_ax, "Next")
+        self.prev_button.on_clicked(self._on_prev_clicked)
+        self.next_button.on_clicked(self._on_next_clicked)
         self.fig.canvas.mpl_connect("key_press_event", self._on_key)
         self._render()
 
@@ -75,19 +83,42 @@ class SimpleBrowser:
             ax.clear()
             ax.axis("off")
 
-        self.status.set_text(f"Slide {self.page+1}/{self.pages} – ←/→ or n/p to browse")
+        self.status.set_text(
+            f"Slide {self.page+1}/{self.pages} - keys: left/right, n/p, a/d, space/backspace"
+        )
         self.fig.canvas.draw_idle()
 
+    @staticmethod
+    def _normalize_key(raw_key: str | None) -> str:
+        if not raw_key:
+            return ""
+        key = raw_key.lower().strip()
+        if "+" in key:
+            key = key.split("+")[-1]
+        return key
+
+    def _next_page(self) -> None:
+        if self.page < self.pages - 1:
+            self.page += 1
+            self._render()
+
+    def _prev_page(self) -> None:
+        if self.page > 0:
+            self.page -= 1
+            self._render()
+
+    def _on_next_clicked(self, _event) -> None:
+        self._next_page()
+
+    def _on_prev_clicked(self, _event) -> None:
+        self._prev_page()
+
     def _on_key(self, event):
-        key = (event.key or "").lower()
-        if key in ("right", "→", "pagedown", "pgdown", "n"):
-            if self.page < self.pages - 1:
-                self.page += 1
-                self._render()
-        elif key in ("left", "←", "pageup", "pgup", "p"):
-            if self.page > 0:
-                self.page -= 1
-                self._render()
+        key = self._normalize_key(event.key)
+        if key in ("right", "→", "pagedown", "pgdown", "n", "d", "space"):
+            self._next_page()
+        elif key in ("left", "←", "pageup", "pgup", "p", "a", "backspace"):
+            self._prev_page()
 
 
 def main() -> None:
@@ -116,7 +147,7 @@ def main() -> None:
     records = predict_records(model, loader, device, limit=max_records)
 
     SimpleBrowser(records, logger=LOGGER)
-    plt.tight_layout()
+    plt.tight_layout(rect=[0.0, 0.10, 1.0, 1.0])
     plt.show()
 
 

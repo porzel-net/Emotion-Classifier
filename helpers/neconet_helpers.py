@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -190,11 +190,109 @@ def describe_model(model: nn.Module, logger: Optional[logging.Logger] = None) ->
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     modules = ", ".join(name for name, _ in model.named_children())
     logger.info(
-        "Model summary: ResNet | %d total params (%d trainable) | modules=%s",
+        "Model summary: %s | %d total params (%d trainable) | modules=%s",
+        model.__class__.__name__,
         total,
         trainable,
         modules,
     )
+
+
+def _normalize_state_dict(raw_state: Any) -> dict[str, torch.Tensor]:
+    state = raw_state
+    if isinstance(state, dict):
+        if isinstance(state.get("state_dict"), dict):
+            state = state["state_dict"]
+        elif isinstance(state.get("model_state_dict"), dict):
+            state = state["model_state_dict"]
+    if not isinstance(state, dict):
+        raise TypeError(f"Unsupported checkpoint format: {type(state)!r}")
+    if state and all(isinstance(key, str) and key.startswith("module.") for key in state.keys()):
+        state = {key.removeprefix("module."): value for key, value in state.items()}
+    return state
+
+
+def _is_emotion_resnet_state(state: dict[str, torch.Tensor]) -> bool:
+    if any(key.startswith(("landmark_attention.", "gnn_branch.", "sobel_branch.")) for key in state):
+        return True
+    conv1 = state.get("conv1.weight")
+    if conv1 is not None and conv1.ndim == 4 and conv1.shape[0] != 64:
+        return True
+    return "conv1.bias" not in state
+
+
+def _layer4_channels(state: dict[str, torch.Tensor]) -> int:
+    for key, tensor in state.items():
+        if key.startswith("layer4.") and key.endswith(".conv2.weight") and tensor.ndim == 4:
+            return int(tensor.shape[0])
+    tensor = state.get("layer4.0.conv1.weight")
+    if tensor is None or tensor.ndim != 4:
+        raise KeyError("Unable to infer layer4 channel count from checkpoint.")
+    return int(tensor.shape[0])
+
+
+def _infer_emotion_resnet_kwargs(
+    state: dict[str, torch.Tensor],
+    logger: Optional[logging.Logger] = None,
+) -> dict[str, Any]:
+    logger = logger or LOGGER
+    conv1 = state.get("conv1.weight")
+    fc_weight = state.get("fc.weight")
+    if conv1 is None or fc_weight is None:
+        raise KeyError("Checkpoint is missing required keys (conv1.weight/fc.weight).")
+
+    width_multiplier = max(0.25, float(conv1.shape[0]) / 64.0)
+    num_classes = int(fc_weight.shape[0])
+    fc_input_dim = int(fc_weight.shape[1])
+    backbone_dim = _layer4_channels(state)
+
+    use_landmarks = any(key.startswith("landmark_attention.") for key in state)
+    use_gnn = any(key.startswith("gnn_branch.") for key in state)
+    use_sobel_branch = any(key.startswith("sobel_branch.") for key in state)
+
+    landmark_branch_dim = 0
+    branch_weight = state.get("landmark_attention.feature_branch.3.weight")
+    if branch_weight is not None and branch_weight.ndim >= 1:
+        landmark_branch_dim = int(branch_weight.shape[0])
+
+    gnn_hidden_dim = 64
+    gnn_weight = state.get("gnn_branch.node_proj.weight")
+    if gnn_weight is not None and gnn_weight.ndim >= 1:
+        gnn_hidden_dim = int(gnn_weight.shape[0])
+
+    sobel_branch_dim = 32
+    sobel_weight = state.get("sobel_branch.extractor.3.weight")
+    if sobel_weight is not None and sobel_weight.ndim >= 1:
+        sobel_branch_dim = int(sobel_weight.shape[0])
+
+    landmark_dim = 0
+    if use_landmarks:
+        inferred = fc_input_dim - backbone_dim - landmark_branch_dim
+        if use_gnn:
+            inferred -= gnn_hidden_dim
+        if use_sobel_branch:
+            inferred -= sobel_branch_dim
+        landmark_dim = max(0, int(inferred))
+
+    logger.info(
+        "Detected EmotionResNet checkpoint: width=%.2f classes=%d landmarks=%d gnn=%s gnn_hidden=%d sobel=%s sobel_dim=%d",
+        width_multiplier,
+        num_classes,
+        landmark_dim,
+        use_gnn,
+        gnn_hidden_dim,
+        use_sobel_branch,
+        sobel_branch_dim,
+    )
+    return {
+        "width_multiplier": width_multiplier,
+        "num_classes": num_classes,
+        "landmark_dim": landmark_dim,
+        "use_gnn": use_gnn,
+        "gnn_hidden_dim": gnn_hidden_dim,
+        "use_sobel_branch": use_sobel_branch,
+        "sobel_branch_dim": sobel_branch_dim,
+    }
 
 
 def build_model(
@@ -203,15 +301,39 @@ def build_model(
     logger: Optional[logging.Logger] = None,
 ) -> nn.Module:
     logger = logger or LOGGER
-    model = ResNet(Block, NECONET_PLAN, len(EMOTION_LABELS))
-    model.to(device)
-    state = load_state_dict(weights, device)
-    if isinstance(state, dict) and "state_dict" in state:
-        state = state["state_dict"]
-    model.load_state_dict(state)
-    model.eval()
-    describe_model(model, logger=logger)
-    return model
+    state = _normalize_state_dict(load_state_dict(weights, device))
+
+    legacy_model = ResNet(Block, NECONET_PLAN, len(EMOTION_LABELS)).to(device)
+    try:
+        legacy_model.load_state_dict(state, strict=True)
+        legacy_model.eval()
+        describe_model(legacy_model, logger=logger)
+        return legacy_model
+    except RuntimeError as exc:
+        if not _is_emotion_resnet_state(state):
+            raise RuntimeError(
+                "Checkpoint is incompatible with the legacy Neconet ResNet architecture."
+            ) from exc
+
+    from train.train_emotion_classifier import Block as EvalBlock, EmotionResNet
+
+    kwargs = _infer_emotion_resnet_kwargs(state, logger=logger)
+    eval_model = EmotionResNet(
+        EvalBlock,
+        layers=(2, 2, 2, 2),
+        num_classes=kwargs["num_classes"],
+        width_multiplier=kwargs["width_multiplier"],
+        landmark_dim=kwargs["landmark_dim"],
+        use_gnn=kwargs["use_gnn"],
+        gnn_hidden_dim=kwargs["gnn_hidden_dim"],
+        gnn_message_steps=2,
+        use_sobel_branch=kwargs["use_sobel_branch"],
+        sobel_branch_dim=kwargs["sobel_branch_dim"],
+    ).to(device)
+    eval_model.load_state_dict(state, strict=True)
+    eval_model.eval()
+    describe_model(eval_model, logger=logger)
+    return eval_model
 
 
 def get_device(choice: Optional[str] = None) -> torch.device:

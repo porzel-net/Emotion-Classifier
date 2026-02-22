@@ -190,11 +190,20 @@ def open_capture(args: argparse.Namespace) -> cv2.VideoCapture:
     if args.webcam:
         cap = cv2.VideoCapture(0)
     elif args.video:
+        if not args.video.exists():
+            raise FileNotFoundError(f"Video file not found: {args.video}")
+        if not args.video.is_file():
+            raise ValueError(f"Video path is not a file: {args.video}")
         cap = cv2.VideoCapture(str(args.video))
     else:
         raise ValueError("Either --webcam or --video must be provided.")
     if not cap.isOpened():
-        raise RuntimeError("Unable to open capture device")
+        if args.video:
+            raise RuntimeError(
+                f"Unable to open video stream from: {args.video} "
+                "(unsupported codec/container or unreadable file)."
+            )
+        raise RuntimeError("Unable to open webcam capture device.")
     return cap
 
 

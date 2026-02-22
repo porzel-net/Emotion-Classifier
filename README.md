@@ -184,6 +184,99 @@ python -m visualize.predict_emotion --video video.mov --output video-out.mov --e
 | `--occlusion-patch` | No | `8` | Patch size for occlusion explanation. |
 | `--occlusion-stride` | No | `4` | Patch stride for occlusion explanation. |
 
+### 6.1 Browse First Prediction Slides
+
+Script: `visualize/show_emotion_classifier_prediction.py`
+
+Purpose:
+- runs prediction on the test split,
+- loads only the first `N` slides for a quick preview,
+- displays a paged `3x3` grid with predicted labels/confidence.
+
+Example:
+
+```bash
+python -m visualize.show_emotion_classifier_prediction \
+  --max-slides 4 \
+  --weights models/Neconet_Weights3.pth \
+  --device mps
+```
+
+#### Parameters
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `--weights`, `--weights-dir` | No | `models/Neconet_Weights3.pth` | Checkpoint file or directory. |
+| `--dataset-root` | No | `data/fer2013-prepared` | Root folder containing prepared split folders. |
+| `--device` | No | auto | Torch device override (`cpu`, `mps`, `cuda`). |
+| `--max-slides` | No | `4` | Maximum number of pages to pre-load. |
+| `--batch-size` | No | `32` | Inference batch size. |
+| `--workers` | No | `2` | Number of DataLoader worker processes. |
+
+### 6.2 Display Cropper Predictions
+
+Script: `visualize/display_cropping_predictions.py`
+
+Purpose:
+- loads a trained SoloFace cropper model,
+- compares predicted face box vs. ground-truth box,
+- visualizes samples in a paged grid (`←/→`).
+
+Example:
+
+```bash
+python -m visualize.display_cropping_predictions \
+  --data-dir data/soloface-detection-dataset \
+  --subset test \
+  --model models/solo_cropper.keras \
+  --rows 3 \
+  --cols 3
+```
+
+#### Parameters
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `--data-dir` | No | `data/soloface-detection-dataset` | Root with split folders (`train/`, `val/`, `test/`). |
+| `--subset` | No | `test` | Split to visualize. |
+| `--model` | No | `models/solo_cropper.keras` | Trained cropper model path. |
+| `--image-size` | No | `64` | Input size used during training/inference preprocessing. |
+| `--rows` | No | `3` | Grid row count per page. |
+| `--cols` | No | `3` | Grid column count per page. |
+| `--start` | No | `0` | Start index used to determine initial page. |
+| `--max-samples` | No | unlimited | Optional cap of loaded samples. |
+
+### 6.3 Display Landmark Predictions
+
+Script: `visualize/display_landmarks_prediction.py`
+
+Purpose:
+- loads the trained landmark detector,
+- predicts landmark coordinates on the test set,
+- overlays ground truth (green) and prediction (red) in a paged grid.
+
+Example:
+
+```bash
+python -m visualize.display_landmarks_prediction \
+  --data-dir data/cropped-face-keypoint-dataset-68-landmarks \
+  --csv test.csv \
+  --images test \
+  --model models/landmarks_detector.keras
+```
+
+#### Parameters
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `--data-dir` | No | `data/cropped-face-keypoint-dataset-68-landmarks` | Root folder with CSV and image directories. |
+| `--csv` | No | `test.csv` | Annotation CSV path relative to `--data-dir`. |
+| `--images` | No | `test` | Image subfolder relative to `--data-dir`. |
+| `--model` | No | `models/landmarks_detector.keras` | Trained landmarks model path. |
+| `--rows` | No | `3` | Grid row count per page. |
+| `--cols` | No | `3` | Grid column count per page. |
+| `--batch-size` | No | `32` | Batch size for prediction. |
+
 ## 7. Train a Custom Face Cropper
 
 Script: `train/train_cropping.py`
