@@ -3,11 +3,10 @@
 ### Core Model Design
 - Implemented the main emotion recognition architecture based on ResNet-18.
 - Adapted the backbone to a lightweight configurable structure suitable for VM-scale training.
-- Implemented the multi-branch feature architecture combining:
-  - CNN backbone representation
+- Tested multi-branch feature architecture’s integrity combining:
   - edge-based feature branch (Sobel)
   - fused feature classification head
-- Implemented configurable model scaling via width multiplier and dropout control.
+- Testing the configurable model scaling via different values of width multiplier and dropout control
 
 ### Model Engineering and Optimization
 - Built the full forward pipeline and feature fusion logic.
